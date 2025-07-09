@@ -170,7 +170,7 @@ export const LandingPage = () => {
 
                     <div className="border-t border-white/10 pt-8">
                         <div className="text-center text-gray-400">
-                            <p>&copy; 2025 EduVerse. Transforming education through immersive technology. All rights reserved.</p>
+                            <p>&copy; 2025 ISSAI Avatar. Transforming education through immersive technology. All rights reserved.</p>
                             <p className="mt-2 text-sm">Made by Adil Ergen | Developed at ISSAI, Nazarbayev University</p>
                         </div>
                     </div>
