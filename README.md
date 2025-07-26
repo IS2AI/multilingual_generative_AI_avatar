@@ -1,4 +1,4 @@
-# 🎓 EduVerse - Virtual Learning Platform
+# 🎓 ISSAI Avatar - Virtual Learning Platform
 
 > **A cutting-edge virtual learning platform featuring AI-powered metahuman avatars, real-time voice recognition, and immersive 3D classrooms.**
 
