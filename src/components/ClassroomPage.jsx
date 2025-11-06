@@ -4,23 +4,36 @@ import { Leva } from "leva";
 import { ClassroomExperience } from "./ClassroomExperience";
 import { ClassroomUI } from "./ClassroomUI";
 import { useLocation, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useChat } from "../hooks/useChat";
 
 export const ClassroomPage = () => {
     const location = useLocation();
-    const userInfo = location.state;
+    const selections = location.state;
+    const { setLanguage, setVoiceGender } = useChat();
 
-    // Redirect to pre-conference if no user info is available
-    if (!userInfo) {
-        return <Navigate to="/pre-conference" replace />;
+    // Redirect to landing if no selections available
+    if (!selections) {
+        return <Navigate to="/" replace />;
     }
+
+    // Initialize settings from landing page selections
+    useEffect(() => {
+        if (selections.language) {
+            setLanguage(selections.language);
+        }
+        if (selections.voiceGender) {
+            setVoiceGender(selections.voiceGender);
+        }
+    }, [selections, setLanguage, setVoiceGender]);
 
     return (
         <>
             <Loader />
             <Leva hidden />
-            <ClassroomUI userInfo={userInfo}>
+            <ClassroomUI userInfo={selections}>
                 <Canvas shadows camera={{ position: [0, 2, 5], fov: 45 }}>
-                    <ClassroomExperience userAvatar={userInfo.selectedAvatar} />
+                    <ClassroomExperience selectedAvatar={selections.avatar} />
                 </Canvas>
             </ClassroomUI>
         </>

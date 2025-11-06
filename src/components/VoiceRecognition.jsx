@@ -22,6 +22,7 @@ export const VoiceRecognition = forwardRef(({ onTranscript, onAutoSend, isActive
         pauseListening,
         resumeListening,
         forceStop,
+        sendNow,
     } = useVoiceRecognition(language);
 
     // Expose control methods through ref
@@ -95,7 +96,7 @@ export const VoiceRecognition = forwardRef(({ onTranscript, onAutoSend, isActive
     }
 
     return (
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2">
             {/* Microphone Button with Visual Feedback */}
             <div className="relative">
                 <button
@@ -152,6 +153,19 @@ export const VoiceRecognition = forwardRef(({ onTranscript, onAutoSend, isActive
                 )}
             </div>
 
+            {/* Instant Send Button */}
+            {isListening && (transcript.trim() || interimTranscript.trim()) && (
+                <button
+                    onClick={sendNow}
+                    className="p-3 bg-green-500 hover:bg-green-600 rounded-full transition-all duration-300 shadow-lg shadow-green-500/30"
+                    title={language === 'kk' ? 'Қазір жіберу' : 'Send now'}
+                >
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                </button>
+            )}
+
             {/* Voice Status Indicator */}
             <div className="flex flex-col">
                 <div className="flex items-center space-x-2">
@@ -176,26 +190,26 @@ export const VoiceRecognition = forwardRef(({ onTranscript, onAutoSend, isActive
                                 ></div>
                             </div>
                             <span className="text-xs text-red-400 font-medium">
-                                {language === 'kk' ? 'Тыңдап жатыр...' : 'Listening...'}
+                                {language === 'kk' ? 'Тыңдап жатыр...' : language === 'ru' ? 'Слушаю...' : 'Listening...'}
                             </span>
                         </>
                     )}
                     {!isListening && hasPermission && !isPaused && (
                         <span className="text-xs text-gray-400">
-                            {language === 'kk' ? 'Дауыс дайын' : 'Voice ready'}
+                            {language === 'kk' ? 'Дауыс дайын' : language === 'ru' ? 'Голос готов' : 'Voice ready'}
                         </span>
                     )}
                     {isPaused && (
                         <div className="flex items-center space-x-1">
                             <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
                             <span className="text-xs text-orange-400">
-                                {language === 'kk' ? 'Үзілген (AI жауап беруде)' : 'Paused (AI responding)'}
+                                {language === 'kk' ? 'Үзілген (AI жауап беруде)' : language === 'ru' ? 'Пауза (AI отвечает)' : 'Paused (AI responding)'}
                             </span>
                         </div>
                     )}
                     {!hasPermission && (
                         <span className="text-xs text-yellow-400">
-                            {language === 'kk' ? 'Микрофон рұқсаты қажет' : 'Mic permission needed'}
+                            {language === 'kk' ? 'Микрофон рұқсаты қажет' : language === 'ru' ? 'Нужно разрешение микрофона' : 'Mic permission needed'}
                         </span>
                     )}
                 </div>

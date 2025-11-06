@@ -82,8 +82,28 @@ export const useVoiceRecognition = (language = 'kk') => {
 
         recognition.continuous = true;
         recognition.interimResults = true;
-        recognition.lang = language === 'kk' ? 'kk-KZ' : 'en-US';
-        recognition.maxAlternatives = 1;
+
+        // Map language to proper locale
+        const languageMap = {
+            'kk': 'kk-KZ',  // Kazakh
+            'ru': 'ru-RU',  // Russian
+            'en': 'en-US'   // English
+        };
+
+        // Try to use the selected language first, but some browsers support fallback
+        const primaryLang = languageMap[language] || 'kk-KZ';
+        recognition.lang = primaryLang;
+
+        // For multi-language support, try setting alternatives (not supported by all browsers)
+        try {
+            // Some Chrome versions support language alternatives
+            recognition.grammars = null; // Reset grammars
+            // Note: This doesn't work in all browsers, but won't break anything
+        } catch (e) {
+            console.log('Language alternatives not supported');
+        }
+
+        recognition.maxAlternatives = 3; // Increase alternatives to improve detection
 
         recognition.onstart = () => {
             setIsListening(true);
@@ -238,6 +258,25 @@ export const useVoiceRecognition = (language = 'kk') => {
         }
     }, [isListening]);
 
+    const sendNow = useCallback(() => {
+        const currentTranscript = (transcript + interimTranscript).trim();
+        if (currentTranscript && onAutoSendRef.current) {
+            // Clear silence timeout
+            if (silenceTimeoutRef.current) {
+                clearTimeout(silenceTimeoutRef.current);
+                silenceTimeoutRef.current = null;
+            }
+            // Send immediately
+            onAutoSendRef.current(currentTranscript);
+            setTranscript('');
+            setInterimTranscript('');
+            // Stop listening after sending
+            if (recognitionRef.current && isListening) {
+                recognitionRef.current.stop();
+            }
+        }
+    }, [transcript, interimTranscript, isListening]);
+
     // Cleanup on unmount
     useEffect(() => {
         return () => {
@@ -277,5 +316,6 @@ export const useVoiceRecognition = (language = 'kk') => {
         pauseListening,
         resumeListening,
         forceStop,
+        sendNow,
     };
 }; 

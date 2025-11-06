@@ -123,18 +123,99 @@ export function Avatar({ modelPath = "/models/64f1a714fe61576b46f27ca2.glb", ...
     setFacialExpression(message.facialExpression);
     setLipsync(message.lipsync);
 
-    // Handle messages with and without audio
+    // Handle audio from MangiSoz TTS
     if (message.audio) {
-      const audio = new Audio("data:audio/mp3;base64," + message.audio);
-      audio.play();
+      console.log('Avatar: Playing audio from MangiSoz');
+      console.log('Audio data length:', message.audio.length);
+      console.log('Audio preview:', message.audio.substring(0, 50) + '...');
+
+      // Convert HEX string to blob (MangiSoz returns HEX, not base64!)
+      try {
+        // MangiSoz returns audio as HEX string, convert to bytes
+        const hexString = message.audio;
+        const bytes = new Uint8Array(hexString.length / 2);
+        for (let i = 0; i < hexString.length; i += 2) {
+          bytes[i / 2] = parseInt(hexString.substr(i, 2), 16);
+        }
+
+        console.log('Converted HEX to bytes, length:', bytes.length);
+
+        // Check WAV header - RIFF should be first 4 bytes
+        const header = String.fromCharCode(...bytes.slice(0, 4));
+        console.log('Audio header:', header);
+
+        // Try to auto-detect format or use multiple MIME types
+        let mimeType = 'audio/wav';
+        if (header === 'RIFF') {
+          mimeType = 'audio/wav';
+        } else if (bytes[0] === 0xFF && bytes[1] === 0xFB) {
+          mimeType = 'audio/mpeg';
+        }
+
+        console.log('Using MIME type:', mimeType);
+
+        const blob = new Blob([bytes], { type: mimeType });
+        const audioUrl = URL.createObjectURL(blob);
+
+        console.log('Created blob URL:', audioUrl);
+        console.log('Blob size:', blob.size);
+
+        const audio = new Audio(audioUrl);
+        let hasEnded = false;
+
+      const handleEnd = () => {
+        if (hasEnded) return;
+        hasEnded = true;
+        console.log('Audio playback ended');
+        onMessagePlayed();
+      };
+
+      audio.onerror = (e) => {
+        console.error('Audio playback error:', e);
+        console.error('Audio element:', audio);
+        console.error('Error details:', audio.error);
+        // Fallback if audio fails
+        handleEnd();
+      };
+
+      audio.onloadeddata = () => {
+        console.log('Audio loaded successfully, duration:', audio.duration);
+        // Set a safety timeout in case onended doesn't fire
+        if (audio.duration && !isNaN(audio.duration)) {
+          setTimeout(handleEnd, (audio.duration + 1) * 1000);
+        } else {
+          // If duration is unknown, use estimated duration
+          setTimeout(handleEnd, (message.estimatedDuration || 5) * 1000);
+        }
+      };
+
+      audio.onplay = () => {
+        console.log('Audio started playing');
+      };
+
+      audio.play().then(() => {
+        console.log('Audio play() promise resolved');
+      }).catch(err => {
+        console.error('Audio play() failed:', err);
+        handleEnd();
+      });
+
       setAudio(audio);
-      audio.onended = onMessagePlayed;
+      audio.onended = handleEnd;
+
+      } catch (error) {
+        console.error('Error creating audio blob:', error);
+        console.error('This should not happen - audio conversion failed');
+        // Fallback - skip this message
+        onMessagePlayed();
+        return;
+      }
     } else {
-      // For text-only responses (fallback), auto-advance after reading time
-      const wordsPerMinute = 150; // Average reading speed
+      // Fallback: auto-advance after estimated reading time
+      const wordsPerMinute = 150;
       const words = message.text.split(' ').length;
       const readingTimeMs = (words / wordsPerMinute) * 60 * 1000;
-      const minDisplayTime = 3000; // Minimum 3 seconds
+      const minDisplayTime = 3000;
       const displayTime = Math.max(readingTimeMs, minDisplayTime);
 
       setTimeout(() => {
