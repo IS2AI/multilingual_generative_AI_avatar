@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { convertToWav } from '../utils/audioConverter';
 
 // MangiSoz STT API configuration
-const MANGISOZ_STT_API_URL = "/mangisoz-api/v1/translate/audio/";
+const MANGISOZ_STT_API_URL = "/mangisoz-api/v1/transcript/transcript_audio/";
 const MANGISOZ_STT_API_KEY = "XUD5UQxZj5UtcZMglv7sjg";
 
 // Language mapping for MangiSoz
@@ -41,62 +41,34 @@ export const useMangiSozSTT = (language = 'kk') => {
         return hasMediaDevices && hasMediaRecorder;
     }, []);
 
-    // Convert audio blob to base16 (hex) string
-    const blobToBase16 = async (blob) => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const arrayBuffer = reader.result;
-                const bytes = new Uint8Array(arrayBuffer);
-                const hexString = Array.from(bytes)
-                    .map(byte => byte.toString(16).padStart(2, '0'))
-                    .join('');
-                resolve(hexString);
-            };
-            reader.onerror = reject;
-            reader.readAsArrayBuffer(blob);
-        });
-    };
-
-    // Send audio to MangiSoz STT API
+    // Send audio file to MangiSoz STT API
     const transcribeAudio = async (audioBlob) => {
         try {
             setIsProcessing(true);
-            console.log('Converting audio to base16...');
+            console.log('Sending audio file to MangiSoz STT...');
             console.log('Audio blob size:', audioBlob.size, 'type:', audioBlob.type);
 
-            const base16Audio = await blobToBase16(audioBlob);
-            console.log('Base16 audio length:', base16Audio.length);
-            console.log('Base16 preview:', base16Audio.substring(0, 100));
+            // Create FormData and append the audio file
+            const formData = new FormData();
+            formData.append('file', audioBlob, 'audio.wav');
 
-            console.log('Current language param:', language);
-            console.log('Language map:', languageMap);
-            const targetLang = languageMap[language] || 'kaz';
-            console.log('Mapped target language:', targetLang);
+            console.log('Sending request to MangiSoz STT API...');
 
-            // Format exactly as in Postman example - NO source_language, only target_language
-            const requestBody = {
-                target_language: targetLang,
-                audio: base16Audio
-            };
-
-            console.log('Request body:', JSON.stringify({
-                target_language: requestBody.target_language,
-                audio_length: requestBody.audio.length,
-                audio_preview: requestBody.audio.substring(0, 50)
-            }));
-
+            const sttStartTime = performance.now();
             const response = await fetch(
-                `${MANGISOZ_STT_API_URL}?output_format=text`,
+                MANGISOZ_STT_API_URL,
                 {
                     method: "POST",
                     headers: {
-                        "Authorization": `Bearer ${MANGISOZ_STT_API_KEY}`,
-                        "Content-Type": "application/json"
+                        "Authorization": `Bearer ${MANGISOZ_STT_API_KEY}`
+                        // Don't set Content-Type - browser will set it with boundary for FormData
                     },
-                    body: JSON.stringify(requestBody)
+                    body: formData
                 }
             );
+            const sttEndTime = performance.now();
+            const sttTimeSeconds = ((sttEndTime - sttStartTime) / 1000).toFixed(2);
+            console.log('MangiSoz STT time:', sttTimeSeconds, 's');
 
             console.log('MangiSoz STT response status:', response.status);
 
@@ -108,11 +80,18 @@ export const useMangiSozSTT = (language = 'kk') => {
 
             const data = await response.json();
             console.log('MangiSoz STT response:', data);
+            console.log('Response keys:', Object.keys(data));
+            console.log('Full response:', JSON.stringify(data, null, 2));
 
-            const transcribedText = data.text || '';
+            // Try different possible response formats
+            const transcribedText = data.transcription_text || data.text || data.transcript || data.transcription || data.result || '';
             console.log('Transcribed text:', transcribedText);
 
-            return transcribedText.trim();
+            if (!transcribedText) {
+                console.error('Could not find transcribed text in response. Response data:', data);
+            }
+
+            return { text: transcribedText.trim(), sttTime: sttTimeSeconds };
 
         } catch (error) {
             console.error('Transcription error:', error);
@@ -190,6 +169,13 @@ export const useMangiSozSTT = (language = 'kk') => {
             return;
         }
 
+        // Stop existing recording if any
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            console.log('Stopping existing MediaRecorder before starting new one');
+            mediaRecorderRef.current.stop();
+            await new Promise(resolve => setTimeout(resolve, 100)); // Wait a bit
+        }
+
         if (!hasPermission || !mediaStreamRef.current) {
             const success = await initializeAudioAnalysis();
             if (!success) return;
@@ -262,25 +248,27 @@ export const useMangiSozSTT = (language = 'kk') => {
                     console.log('Converted to WAV, size:', wavBlob.size);
 
                     // Transcribe audio
-                    const transcribedText = await transcribeAudio(wavBlob);
+                    const result = await transcribeAudio(wavBlob);
+                    const transcribedText = result.text;
+                    const sttTimeValue = result.sttTime;
+
+                    console.log('=== TRANSCRIPTION COMPLETE ===');
+                    console.log('Transcribed text:', transcribedText);
+                    console.log('STT time:', sttTimeValue);
+                    console.log('Recording duration:', recordingDuration, 'ms');
 
                     if (transcribedText) {
                         setTranscript(transcribedText);
                         setLastSpeechTime(Date.now());
 
-                        // Auto-send after 2 seconds if enabled
+                        // Auto-send immediately if enabled
                         if (autoSendEnabled && onAutoSendRef.current) {
-                            if (silenceTimeoutRef.current) {
-                                clearTimeout(silenceTimeoutRef.current);
-                            }
-
-                            silenceTimeoutRef.current = setTimeout(() => {
-                                if (transcribedText.trim() && onAutoSendRef.current) {
-                                    onAutoSendRef.current(transcribedText.trim());
-                                    setTranscript('');
-                                }
-                            }, 2000);
+                            console.log('Auto-sending transcribed text:', transcribedText);
+                            onAutoSendRef.current(transcribedText.trim(), sttTimeValue);
+                            setTranscript('');
                         }
+                    } else {
+                        console.warn('No transcribed text received');
                     }
                 } catch (error) {
                     console.error('Failed to transcribe audio:', error);
@@ -291,9 +279,56 @@ export const useMangiSozSTT = (language = 'kk') => {
             };
 
             recordingStartTimeRef.current = Date.now();
+            setLastSpeechTime(Date.now()); // Initialize speech time
             mediaRecorder.start();
             setIsListening(true);
             console.log('Recording started');
+
+            // Auto-stop after 2 seconds of silence (increased from 1 second)
+            let lastCheck = Date.now();
+            const checkSilence = () => {
+                if (mediaRecorderRef.current?.state !== 'recording' || !analyserRef.current) {
+                    return;
+                }
+
+                const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+                analyserRef.current.getByteFrequencyData(dataArray);
+                const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+
+                // Higher threshold to ignore background noise
+                if (average > 30) {
+                    // Speech detected, reset timer
+                    lastCheck = Date.now();
+                } else if (Date.now() - lastCheck > 2000) {
+                    // 2 seconds of silence, check if recording is long enough
+                    const recordingDuration = Date.now() - recordingStartTimeRef.current;
+
+                    if (recordingDuration < 2000) {
+                        // Recording too short (less than 2 seconds), ignore it
+                        console.log('Recording too short (', recordingDuration, 'ms), ignoring...');
+                        if (mediaRecorderRef.current?.state === 'recording') {
+                            mediaRecorderRef.current.stop();
+                            // Clear chunks to prevent transcription
+                            audioChunksRef.current = [];
+                        }
+                        setIsListening(false);
+                        return;
+                    }
+
+                    // Good recording, auto-stop
+                    console.log('2 seconds of silence detected after', recordingDuration, 'ms, auto-stopping...');
+                    if (mediaRecorderRef.current?.state === 'recording') {
+                        mediaRecorderRef.current.stop();
+                    }
+                    return;
+                }
+
+                // Check again in 100ms
+                setTimeout(checkSilence, 100);
+            };
+
+            // Start silence detection after 1 second (give time to start speaking)
+            setTimeout(checkSilence, 1000);
 
         } catch (error) {
             console.error('Failed to start recording:', error);

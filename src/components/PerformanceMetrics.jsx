@@ -15,6 +15,12 @@ export const PerformanceMetrics = () => {
 
   const metrics = [
     {
+      label: 'MangiSoz STT',
+      value: `${performanceMetrics.sttTime || '0.00'}s`,
+      color: 'text-purple-400',
+      description: 'Time to transcribe speech to text'
+    },
+    {
       label: 'Oylan API Response',
       value: `${performanceMetrics.oylanTime}s`,
       color: 'text-blue-400',
@@ -53,6 +59,23 @@ export const PerformanceMetrics = () => {
       <div className="mt-4 pt-4 border-t border-gray-700">
         <p className="text-xs text-gray-400 mb-2">Processing Breakdown</p>
         <div className="space-y-2">
+          {performanceMetrics.sttTime > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="text-xs text-gray-400 w-24">STT</div>
+              <div className="flex-1 h-4 bg-gray-700 rounded overflow-hidden">
+                <div
+                  className="h-full bg-purple-500"
+                  style={{
+                    width: `${(parseFloat(performanceMetrics.sttTime) / parseFloat(performanceMetrics.totalTime)) * 100}%`
+                  }}
+                ></div>
+              </div>
+              <div className="text-xs text-gray-400 w-12 text-right">
+                {((parseFloat(performanceMetrics.sttTime) / parseFloat(performanceMetrics.totalTime)) * 100).toFixed(0)}%
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-2">
             <div className="text-xs text-gray-400 w-24">Oylan</div>
             <div className="flex-1 h-4 bg-gray-700 rounded overflow-hidden">
@@ -69,7 +92,7 @@ export const PerformanceMetrics = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="text-xs text-gray-400 w-24">MangiSoz</div>
+            <div className="text-xs text-gray-400 w-24">TTS</div>
             <div className="flex-1 h-4 bg-gray-700 rounded overflow-hidden">
               <div
                 className="h-full bg-green-500"

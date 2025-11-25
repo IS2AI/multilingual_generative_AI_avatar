@@ -42,12 +42,49 @@
 - **Real-time lip-sync** and facial expressions
 - **Multiple animation states** (idle, talking, gesturing)
 
+## 📝 Recent Updates (v2.0.0)
+
+### 🎤 **MangiSoz STT Integration**
+- **Migrated from Web Speech API to MangiSoz STT API** for improved Kazakh and Russian speech recognition
+- **Real-time STT performance tracking** - monitor speech-to-text conversion time
+- **Smart audio processing** - automatically stops recording after 2 seconds of silence
+- **Minimum recording duration** - ignores recordings shorter than 2 seconds to prevent false triggers
+- **Enhanced noise filtering** - improved threshold (>30) for better speech detection
+
+### ⚡ **Performance Improvements**
+- **Comprehensive metrics dashboard** displaying:
+  - **STT Time** - Speech-to-text conversion duration
+  - **Oylan API Time** - AI response generation time
+  - **TTS Time** - Text-to-speech synthesis time
+  - **Total Time** - End-to-end latency tracking
+- **Visual breakdown** - Progress bars showing time distribution across processing stages
+
+### 🔧 **API Enhancements**
+- **Oylan API optimization** with token limiting (max_tokens: 350)
+- **Improved response cleaning** - better removal of `<think>` tags and formatting
+- **Automatic language detection** - detects response language for proper TTS
+- **Fallback responses** - handles empty or invalid API responses gracefully
+
+### 🎨 **UI/UX Improvements**
+- **Processing indicator** - visual "Processing..." status during STT conversion
+- **Transcript preview** - shows recognized text before sending to AI
+- **Auto-clear input** - input field clears automatically after AI response
+- **Manual stop support** - prevents auto-resume when user manually stops voice recognition
+- **Multilingual UI** - supports Kazakh, Russian, and English interface labels
+
+### 🐛 **Bug Fixes**
+- Fixed microphone language selection synchronization
+- Prevented MediaRecorder conflicts during recording transitions
+- Improved auto-pause/resume behavior during AI responses
+- Enhanced error handling for STT API failures
+
 ## 🚀 Quick Start
 
 ### Prerequisites
 - **Node.js** (v16 or higher)
 - **npm** or **yarn** package manager
-- **Modern browser** with Web Speech API support
+- **Modern browser** with microphone access support
+- **MangiSoz API access** (STT and TTS services)
 
 ### Installation
 
@@ -126,9 +163,10 @@ Navigate to `http://localhost:5173/`
 - **React Three Drei** - Useful helpers and abstractions
 
 ### **Voice & Audio:**
-- **Web Speech API** - Browser-native speech recognition
+- **MangiSoz STT API** - Advanced speech-to-text for Kazakh and Russian languages
+- **MangiSoz TTS API** - High-quality text-to-speech synthesis
 - **Web Audio API** - Audio analysis and visualization
-- **MediaDevices API** - Microphone access
+- **MediaDevices API** - Microphone access and audio recording
 
 ### **Animations:**
 - **GLTF/GLB Models** - 3D avatar with animations
@@ -150,7 +188,8 @@ src/
 │   └── UI.jsx                   # Original UI (legacy)
 ├── hooks/
 │   ├── useChat.jsx              # AI conversation management
-│   └── useVoiceRecognition.jsx  # Voice recognition logic
+│   ├── useMangiSozSTT.jsx       # MangiSoz STT integration
+│   └── useVoiceRecognition.jsx  # Legacy voice recognition (deprecated)
 ├── assets/
 ├── App.jsx                      # Main app with routing
 ├── main.jsx                     # App entry point

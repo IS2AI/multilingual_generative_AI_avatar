@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
+import { useMangiSozSTT } from '../hooks/useMangiSozSTT';
 
 import { forwardRef, useImperativeHandle } from 'react';
 
@@ -14,6 +14,7 @@ export const VoiceRecognition = forwardRef(({ onTranscript, onAutoSend, isActive
         lastSpeechTime,
         autoSendEnabled,
         isPaused,
+        isProcessing,
         startListening,
         stopListening,
         clearTranscript,
@@ -23,7 +24,7 @@ export const VoiceRecognition = forwardRef(({ onTranscript, onAutoSend, isActive
         resumeListening,
         forceStop,
         sendNow,
-    } = useVoiceRecognition(language);
+    } = useMangiSozSTT(language);
 
     // Expose control methods through ref
     useImperativeHandle(ref, () => ({
@@ -169,7 +170,15 @@ export const VoiceRecognition = forwardRef(({ onTranscript, onAutoSend, isActive
             {/* Voice Status Indicator */}
             <div className="flex flex-col">
                 <div className="flex items-center space-x-2">
-                    {isListening && (
+                    {isProcessing && (
+                        <>
+                            <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                            <span className="text-xs text-blue-400 font-medium">
+                                {language === 'kk' ? 'Өңдеуде...' : language === 'ru' ? 'Обработка...' : 'Processing...'}
+                            </span>
+                        </>
+                    )}
+                    {!isProcessing && isListening && (
                         <>
                             <div className="flex space-x-1">
                                 <div

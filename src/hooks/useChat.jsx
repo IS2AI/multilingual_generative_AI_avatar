@@ -63,19 +63,27 @@ export const ChatProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [cameraZoomed, setCameraZoomed] = useState(false);
   const [performanceMetrics, setPerformanceMetrics] = useState(null);
+  const [sttTime, setSttTime] = useState(0); // Store STT time
 
-  const chat = async (message, userLanguage = language) => {
+  const chat = async (message, userLanguage = language, voiceSttTime = null) => {
     setLoading(true);
     setError(null);
     console.log('Chat called with message:', message, 'language:', userLanguage);
+    console.log('Voice STT time passed:', voiceSttTime);
+    console.log('Current STT time state:', sttTime);
 
     const startTime = performance.now();
+    const currentSttTime = voiceSttTime !== null ? voiceSttTime : sttTime; // Use passed STT time or fallback to state
+
     const metrics = {
       totalTime: 0,
       oylanTime: 0,
       mangiSozTime: 0,
+      sttTime: parseFloat(currentSttTime) || 0, // Include STT time from voice recognition
       audioDuration: 0
     };
+
+    console.log('Metrics initialized with STT time:', metrics.sttTime);
 
     try {
       // Call Oylan API using FormData (multipart/form-data)
@@ -85,6 +93,12 @@ export const ChatProvider = ({ children }) => {
       const oylanStartTime = performance.now();
       const formData = new FormData();
       formData.append('content', message);
+      // Try different parameter names for token limit
+      formData.append('max_tokens', '350');
+      formData.append('max_length', '350');
+      formData.append('max_response_length', '350');
+
+      console.log('Sending to Oylan with token limit: 350');
 
       const response = await fetch(OYLAN_API_URL, {
         method: "POST",
@@ -115,16 +129,30 @@ export const ChatProvider = ({ children }) => {
       console.log('Raw response text:', responseText);
 
       // Remove <think> tags - handle both complete and incomplete tags
-      responseText = responseText.replace(/<think>[\s\S]*?<\/think>/g, ''); // Complete tags
-      responseText = responseText.replace(/<think>/g, ''); // Remaining opening tags
-      responseText = responseText.replace(/<\/think>/g, ''); // Remaining closing tags
+      // First, remove complete think blocks (greedy and non-greedy)
+      responseText = responseText.replace(/<think>[\s\S]*?<\/think>/gi, '');
+      responseText = responseText.replace(/<think[\s\S]*?<\/think>/gi, '');
+
+      // Remove any remaining opening or closing tags
+      responseText = responseText.replace(/<\/?think[^>]*>/gi, '');
+
+      // Clean up multiple newlines and extra spaces
+      responseText = responseText.replace(/\n\s*\n\s*\n/g, '\n\n');
       responseText = responseText.trim();
 
       console.log('Cleaned response text:', responseText);
 
       // Detect language of response
-      const detectedLang = detectLanguage(responseText);
+      const detectedLang = detectLanguage(responseText) || userLanguage;
       console.log('Detected language:', detectedLang);
+
+      // If response is empty or too short after cleaning, provide fallback
+      if (!responseText || responseText.length < 5) {
+        console.warn('Response too short after cleaning, using fallback');
+        responseText = detectedLang === 'kk' ? 'Кешіріңіз, жауап беру мүмкін болмады.' :
+                       detectedLang === 'ru' ? 'Извините, не смог ответить.' :
+                       'Sorry, could not respond.';
+      }
 
       // Call MangiSoz TTS API to generate audio
       console.log('Calling MangiSoz TTS API...');
@@ -185,13 +213,15 @@ export const ChatProvider = ({ children }) => {
       // Generate lipsync
       const lipsync = generateLipsync(responseText, estimatedDuration);
 
-      // Calculate total time
+      // Calculate total time (STT + Oylan + TTS)
       const endTime = performance.now();
-      metrics.totalTime = ((endTime - startTime) / 1000).toFixed(2);
+      const calculatedTotal = parseFloat(metrics.sttTime) + parseFloat(metrics.oylanTime) + parseFloat(metrics.mangiSozTime);
+      metrics.totalTime = calculatedTotal.toFixed(2);
 
-      // Set metrics
+      // Set metrics and reset STT time AFTER setting metrics
       setPerformanceMetrics(metrics);
       console.log('Performance metrics:', metrics);
+      setSttTime(0); // Reset STT time for next request
 
       // Prepare response message with audio
       const responseMessage = {
@@ -265,6 +295,7 @@ export const ChatProvider = ({ children }) => {
         voiceGender,
         setVoiceGender,
         performanceMetrics,
+        setSttTime,
       }}
     >
       {children}

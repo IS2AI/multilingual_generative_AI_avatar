@@ -6,7 +6,7 @@ import { PerformanceMetrics } from "./PerformanceMetrics";
 
 export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
     const input = useRef();
-    const { chat, loading, cameraZoomed, setCameraZoomed, message, setLanguage, voiceGender, setVoiceGender, stopSpeaking } = useChat();
+    const { chat, loading, cameraZoomed, setCameraZoomed, message, setLanguage, voiceGender, setVoiceGender, stopSpeaking, setSttTime } = useChat();
 
     const [isVoiceActive, setIsVoiceActive] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
@@ -24,13 +24,12 @@ export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
         }
     }, [userLanguage, userInfo?.voiceGender, setLanguage, setVoiceGender]);
 
-    const sendMessage = (text = null) => {
+    const sendMessage = (text = null, voiceSttTime = null) => {
         const messageText = text || input.current.value;
         if (!loading && !message && messageText.trim()) {
-            chat(messageText.trim(), userLanguage);
-            if (input.current) {
-                input.current.value = "";
-            }
+            chat(messageText.trim(), userLanguage, voiceSttTime);
+            // Don't clear the input immediately - let it stay while AI is thinking
+            // It will be cleared after the AI responds
         }
     };
 
@@ -43,31 +42,63 @@ export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
         }
     };
 
-    const handleAutoSend = (transcript) => {
+    const handleAutoSend = (transcript, sttTime) => {
         if (transcript.trim()) {
-            sendMessage(transcript);
+            const sttTimeValue = parseFloat(sttTime) || 0;
+            console.log('handleAutoSend called with STT time:', sttTimeValue);
+
+            // First show the transcript in the input field
+            if (input.current) {
+                input.current.value = transcript;
+            }
+            // Then send it after a brief delay so user can see what was recognized
+            setTimeout(() => {
+                sendMessage(transcript, sttTimeValue);
+            }, 500); // 500ms delay to show the text
         }
     };
+
+    const [manualStop, setManualStop] = useState(false);
 
     const handleVoiceToggle = (isActive) => {
         setIsVoiceActive(isActive);
     };
 
-    // Automatically pause voice recognition when AI is responding
+    const handleStopSpeaking = () => {
+        stopSpeaking();
+        setManualStop(true); // Mark as manually stopped
+        // Force stop voice recognition
+        if (voiceRecognitionRef.current) {
+            voiceRecognitionRef.current.forceStop();
+        }
+    };
+
+    // Automatically pause voice recognition when AI is responding and clear input when done
     useEffect(() => {
         if (voiceRecognitionRef.current) {
             if (loading || message) {
                 voiceRecognitionRef.current.pauseListening();
             } else if (!loading && !message && voiceRecognitionRef.current.isPaused) {
-                const resumeTimeout = setTimeout(() => {
-                    if (voiceRecognitionRef.current && voiceRecognitionRef.current.isPaused) {
-                        voiceRecognitionRef.current.resumeListening();
-                    }
-                }, 1000);
-                return () => clearTimeout(resumeTimeout);
+                // Clear input field after AI is done responding
+                if (input.current) {
+                    input.current.value = "";
+                }
+
+                // Only auto-resume if NOT manually stopped
+                if (!manualStop) {
+                    const resumeTimeout = setTimeout(() => {
+                        if (voiceRecognitionRef.current && voiceRecognitionRef.current.isPaused) {
+                            voiceRecognitionRef.current.resumeListening();
+                        }
+                    }, 1000);
+                    return () => clearTimeout(resumeTimeout);
+                } else {
+                    // Reset manual stop flag for next interaction
+                    setManualStop(false);
+                }
             }
         }
-    }, [loading, message]);
+    }, [loading, message, manualStop]);
 
     if (hidden) {
         return null;
@@ -194,7 +225,7 @@ export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
                                                 {avatarNames[selectedAvatar]}
                                             </div>
                                             <button
-                                                onClick={stopSpeaking}
+                                                onClick={handleStopSpeaking}
                                                 className="p-2 bg-red-500/80 hover:bg-red-500 rounded-lg transition-colors"
                                                 title="Stop speaking"
                                             >
