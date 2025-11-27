@@ -272,6 +272,16 @@ export function Avatar({ modelPath = "/models/64f1a714fe61576b46f27ca2.glb", ...
   const [facialExpression, setFacialExpression] = useState("");
   const [audio, setAudio] = useState();
 
+  // Stop audio when message is cleared
+  useEffect(() => {
+    if (!message && audio) {
+      console.log('Message cleared - stopping audio playback');
+      audio.pause();
+      audio.currentTime = 0;
+      setAudio(null);
+    }
+  }, [message, audio]);
+
   useFrame(() => {
     // Check if the model has the expected eye nodes for morphing
     if (!setupMode && nodes.EyeLeft && nodes.EyeLeft.morphTargetDictionary) {

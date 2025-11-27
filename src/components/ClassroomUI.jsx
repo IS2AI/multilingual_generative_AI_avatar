@@ -6,15 +6,25 @@ import { PerformanceMetrics } from "./PerformanceMetrics";
 
 export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
     const input = useRef();
-    const { chat, loading, cameraZoomed, setCameraZoomed, message, setLanguage, voiceGender, setVoiceGender, stopSpeaking, setSttTime } = useChat();
+    const { chat, loading, cameraZoomed, setCameraZoomed, message, setLanguage, voiceGender, setVoiceGender, stopSpeaking, setSttTime, showGreeting } = useChat();
 
     const [isVoiceActive, setIsVoiceActive] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const voiceRecognitionRef = useRef();
+    const [lastInteractionTime, setLastInteractionTime] = useState(Date.now());
 
     // Get user's selected language and voice
     const userLanguage = userInfo?.language || 'kk';
     const selectedAvatar = userInfo?.avatar || 'avatar1';
+
+    // Kazakh greeting phrases for idle timeout
+    const kazakhGreetings = [
+        "Қалың қалай?",
+        "Сәлеметсіз бе?",
+        "Сізге қалай көмектесе аламын?",
+        "Мені тыңдап тұрсыз ба?",
+        "Сұрағыңыз бар ма?",
+    ];
 
     // Set the language and voice in chat context when component loads
     useEffect(() => {
@@ -24,10 +34,32 @@ export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
         }
     }, [userLanguage, userInfo?.voiceGender, setLanguage, setVoiceGender]);
 
+    // Idle timeout: show greeting after 20 seconds of inactivity
+    useEffect(() => {
+        const checkIdleTimeout = setInterval(() => {
+            const now = Date.now();
+            const timeSinceLastInteraction = now - lastInteractionTime;
+            const IDLE_TIMEOUT = 20000; // 20 seconds
+
+            if (timeSinceLastInteraction >= IDLE_TIMEOUT && !loading && !message) {
+                // Pick a random greeting
+                const randomGreeting = kazakhGreetings[Math.floor(Math.random() * kazakhGreetings.length)];
+                console.log('Idle timeout reached, showing greeting:', randomGreeting);
+                showGreeting(randomGreeting, 'kk');
+                // Reset interaction time to prevent continuous greetings
+                setLastInteractionTime(Date.now());
+            }
+        }, 5000); // Check every 5 seconds
+
+        return () => clearInterval(checkIdleTimeout);
+    }, [lastInteractionTime, loading, message, showGreeting]);
+
     const sendMessage = (text = null, voiceSttTime = null) => {
         const messageText = text || input.current.value;
         if (!loading && !message && messageText.trim()) {
             chat(messageText.trim(), userLanguage, voiceSttTime);
+            // Reset idle timer
+            setLastInteractionTime(Date.now());
             // Don't clear the input immediately - let it stay while AI is thinking
             // It will be cleared after the AI responds
         }
@@ -58,47 +90,47 @@ export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
         }
     };
 
-    const [manualStop, setManualStop] = useState(false);
-
     const handleVoiceToggle = (isActive) => {
         setIsVoiceActive(isActive);
+        // Reset idle timer when voice is activated
+        if (isActive) {
+            setLastInteractionTime(Date.now());
+        }
     };
 
     const handleStopSpeaking = () => {
+        // Stop audio playback
         stopSpeaking();
-        setManualStop(true); // Mark as manually stopped
-        // Force stop voice recognition
+
+        // Force stop voice recognition completely
         if (voiceRecognitionRef.current) {
             voiceRecognitionRef.current.forceStop();
         }
+
+        // Clear input field
+        if (input.current) {
+            input.current.value = "";
+        }
+
+        // Set voice as inactive
+        setIsVoiceActive(false);
     };
 
     // Automatically pause voice recognition when AI is responding and clear input when done
     useEffect(() => {
         if (voiceRecognitionRef.current) {
             if (loading || message) {
+                // Pause voice recognition while AI is processing or speaking
                 voiceRecognitionRef.current.pauseListening();
-            } else if (!loading && !message && voiceRecognitionRef.current.isPaused) {
+            } else if (!loading && !message) {
                 // Clear input field after AI is done responding
                 if (input.current) {
                     input.current.value = "";
                 }
-
-                // Only auto-resume if NOT manually stopped
-                if (!manualStop) {
-                    const resumeTimeout = setTimeout(() => {
-                        if (voiceRecognitionRef.current && voiceRecognitionRef.current.isPaused) {
-                            voiceRecognitionRef.current.resumeListening();
-                        }
-                    }, 1000);
-                    return () => clearTimeout(resumeTimeout);
-                } else {
-                    // Reset manual stop flag for next interaction
-                    setManualStop(false);
-                }
+                // DO NOT auto-resume - user must manually click microphone button
             }
         }
-    }, [loading, message, manualStop]);
+    }, [loading, message]);
 
     if (hidden) {
         return null;
@@ -118,21 +150,24 @@ export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
             connectedTo: 'Oylan-ға қосулы',
             placeholder: 'Жазбаңызды теріңіз...',
             send: 'Жіберу',
-            thinking: 'Ойланып жатыр...'
+            thinking: 'Ойланып жатыр...',
+            stop: 'Тоқтату'
         },
         ru: {
             talkingWith: 'Разговор с Айгерим',
             connectedTo: 'Подключено к Oylan',
             placeholder: 'Введите сообщение...',
             send: 'Отправить',
-            thinking: 'Думаю...'
+            thinking: 'Думаю...',
+            stop: 'Остановить'
         },
         en: {
             talkingWith: 'Talking with Aigerim',
             connectedTo: 'Connected to Oylan',
             placeholder: 'Type your message...',
             send: 'Send',
-            thinking: 'Thinking...'
+            thinking: 'Thinking...',
+            stop: 'Stop'
         }
     };
 
@@ -227,7 +262,7 @@ export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
                                             <button
                                                 onClick={handleStopSpeaking}
                                                 className="p-2 bg-red-500/80 hover:bg-red-500 rounded-lg transition-colors"
-                                                title="Stop speaking"
+                                                title={t.stop}
                                             >
                                                 <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                                                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />

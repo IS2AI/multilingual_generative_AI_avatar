@@ -94,11 +94,11 @@ export const ChatProvider = ({ children }) => {
       const formData = new FormData();
       formData.append('content', message);
       // Try different parameter names for token limit
-      formData.append('max_tokens', '350');
-      formData.append('max_length', '350');
-      formData.append('max_response_length', '350');
+      formData.append('max_tokens', '300');
+      formData.append('max_length', '300');
+      formData.append('max_response_length', '300');
 
-      console.log('Sending to Oylan with token limit: 350');
+      console.log('Sending to Oylan with token limit: 300');
 
       const response = await fetch(OYLAN_API_URL, {
         method: "POST",
@@ -127,32 +127,100 @@ export const ChatProvider = ({ children }) => {
       let responseText = data.response?.content || "No response";
 
       console.log('Raw response text:', responseText);
+      console.log('Raw response length:', responseText.length);
 
-      // Remove <think> tags - handle both complete and incomplete tags
-      // First, remove complete think blocks (greedy and non-greedy)
+      // AGGRESSIVE CLEANING: Remove all thinking content
+
+      // 1. Remove content between <think> tags (multiple patterns)
       responseText = responseText.replace(/<think>[\s\S]*?<\/think>/gi, '');
       responseText = responseText.replace(/<think[\s\S]*?<\/think>/gi, '');
+      responseText = responseText.replace(/\[думаю\][\s\S]*?\[\/думаю\]/gi, '');
 
-      // Remove any remaining opening or closing tags
+      // 2. Handle orphaned closing tags - remove everything BEFORE </think>
+      if (responseText.includes('</think>') && !responseText.includes('<think>')) {
+        console.log('⚠️ Found orphaned </think> tag - removing everything before it');
+        const parts = responseText.split('</think>');
+        responseText = parts[parts.length - 1]; // Keep only what's after the last </think>
+      }
+
+      // 3. Handle orphaned opening tags - remove everything AFTER <think>
+      if (responseText.includes('<think>') && !responseText.includes('</think>')) {
+        console.log('⚠️ Found orphaned <think> tag - removing everything after it');
+        responseText = responseText.split('<think>')[0]; // Keep only what's before <think>
+      }
+
+      // 4. Remove any remaining tags
       responseText = responseText.replace(/<\/?think[^>]*>/gi, '');
+      responseText = responseText.replace(/\[?\/?думаю\]?/gi, '');
 
-      // Clean up multiple newlines and extra spaces
-      responseText = responseText.replace(/\n\s*\n\s*\n/g, '\n\n');
+      // 3. Remove common thinking patterns (English)
+      responseText = responseText.replace(/^(Okay|Alright|Let me|I need to|First|So|Well),?\s+(think|answer|respond|address|tackle|consider)[\s\S]*?(\n\n|\.\s+[A-ZА-ЯӘ])/i, '$3');
+      responseText = responseText.replace(/^.*?(Let me think|I should|I need to).*?\n/gim, '');
+
+      // 4. Remove lines that start with thinking indicators
+      responseText = responseText.replace(/^(Thinking:|Analysis:|Plan:|Step \d+:).*$/gim, '');
+
+      // 5. Remove common AI artifacts at the start
+      responseText = responseText.replace(/^(continuation|answer|response|reply|result)\.?\s*/i, '');
+      responseText = responseText.replace(/^(Continuation|Answer|Response|Reply|Result):\s*/gim, '');
+
+      // 6. Clean up multiple newlines and extra spaces
+      responseText = responseText.replace(/\n\s*\n\s*\n+/g, '\n\n');
+      responseText = responseText.replace(/^\s+|\s+$/g, ''); // trim
       responseText = responseText.trim();
 
       console.log('Cleaned response text:', responseText);
+      console.log('Cleaned response length:', responseText.length);
 
       // Detect language of response
       const detectedLang = detectLanguage(responseText) || userLanguage;
       console.log('Detected language:', detectedLang);
+      console.log('Expected language:', userLanguage);
 
-      // If response is empty or too short after cleaning, provide fallback
-      if (!responseText || responseText.length < 5) {
-        console.warn('Response too short after cleaning, using fallback');
-        responseText = detectedLang === 'kk' ? 'Кешіріңіз, жауап беру мүмкін болмады.' :
-                       detectedLang === 'ru' ? 'Извините, не смог ответить.' :
-                       'Sorry, could not respond.';
+      // Check if response is still thinking content (contains English thinking phrases)
+      const thinkingIndicators = /\b(then|first|next|after|but wait|maybe|should i|perhaps|also|finally|wait|oh)\b.*\b(the|a|an|to|for|with|from)\b/i;
+      const isStillThinking = detectedLang === 'en' && userLanguage !== 'en' && thinkingIndicators.test(responseText);
+
+      // If response is empty, too short, or still thinking content, provide fallback
+      if (!responseText || responseText.length < 5 || isStillThinking) {
+        if (isStillThinking) {
+          console.warn('⚠️ Response is still thinking content in English! Using fallback.');
+        } else {
+          console.warn('Response too short after cleaning, using fallback');
+        }
+
+        responseText = userLanguage === 'kk' ? 'Кешіріңіз, жауап беру мүмкін болмады. Сұрағыңызды қайталап көріңіз.' :
+                       userLanguage === 'ru' ? 'Извините, не смог ответить. Попробуйте переформулировать вопрос.' :
+                       'Sorry, could not respond. Please try rephrasing your question.';
       }
+
+      // Truncate response to ~300 tokens (approximately 150 words for safety)
+      // This ensures the response is not too long for TTS and user reading
+      const maxWords = 150; // Reduced from 200 to ensure shorter responses
+      const words = responseText.split(/\s+/).filter(word => word.length > 0); // Remove empty strings
+
+      console.log(`=== WORD COUNT CHECK ===`);
+      console.log(`Total words before truncation: ${words.length}`);
+      console.log(`Max words allowed: ${maxWords}`);
+
+      if (words.length > maxWords) {
+        console.log(`⚠️ Response too long! Truncating from ${words.length} to ${maxWords} words`);
+
+        // Take first maxWords words
+        const truncatedWords = words.slice(0, maxWords);
+        responseText = truncatedWords.join(' ');
+
+        // Add ellipsis if we truncated mid-sentence
+        if (!responseText.match(/[.!?]$/)) {
+          responseText += '...';
+        }
+
+        console.log(`✂️ Truncated response (${truncatedWords.length} words):`, responseText.substring(0, 100) + '...');
+      } else {
+        console.log(`✅ Response length OK (${words.length} words)`);
+      }
+
+      console.log(`Final response word count: ${responseText.split(/\s+/).filter(w => w.length > 0).length}`);
 
       // Call MangiSoz TTS API to generate audio
       console.log('Calling MangiSoz TTS API...');
@@ -272,6 +340,68 @@ export const ChatProvider = ({ children }) => {
     setMessages([]);
   };
 
+  const showGreeting = async (greetingText, greetingLanguage = language) => {
+    // Don't show greeting if already loading or speaking
+    if (loading || message) {
+      console.log('Already busy, skipping greeting');
+      return;
+    }
+
+    console.log('Showing greeting:', greetingText, 'in language:', greetingLanguage);
+
+    try {
+      // Call MangiSoz TTS for the greeting
+      const mangiSozLang = languageMap[greetingLanguage] || 'kaz';
+
+      const ttsFormData = new FormData();
+      ttsFormData.append('text', greetingText);
+      ttsFormData.append('target_language', mangiSozLang);
+      ttsFormData.append('voice_gender', voiceGender);
+
+      const ttsResponse = await fetch(MANGISOZ_API_URL, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${MANGISOZ_API_KEY}`,
+        },
+        body: ttsFormData
+      });
+
+      if (!ttsResponse.ok) {
+        throw new Error('TTS failed for greeting');
+      }
+
+      const ttsData = await ttsResponse.json();
+      const audioBase64 = ttsData.audio;
+
+      if (!audioBase64) {
+        throw new Error('No audio in greeting TTS');
+      }
+
+      // Estimate duration
+      const wordCount = greetingText.split(/\s+/).length;
+      const estimatedDuration = (wordCount / 150) * 60;
+
+      // Generate lipsync
+      const lipsync = generateLipsync(greetingText, estimatedDuration);
+
+      // Show greeting message
+      const greetingMessage = {
+        text: greetingText,
+        audio: audioBase64,
+        lipsync: lipsync,
+        animation: "Talking_1",
+        facialExpression: "smile",
+        estimatedDuration: estimatedDuration
+      };
+
+      console.log('Showing greeting message');
+      setMessages((messages) => [...messages, greetingMessage]);
+
+    } catch (err) {
+      console.error('Failed to show greeting:', err);
+    }
+  };
+
   useEffect(() => {
     if (messages.length > 0) {
       setMessage(messages[0]);
@@ -287,6 +417,7 @@ export const ChatProvider = ({ children }) => {
         message,
         onMessagePlayed,
         stopSpeaking,
+        showGreeting,
         loading,
         cameraZoomed,
         setCameraZoomed,
