@@ -93,12 +93,22 @@ export const ChatProvider = ({ children }) => {
       const oylanStartTime = performance.now();
       const formData = new FormData();
       formData.append('content', message);
-      // Try different parameter names for token limit
-      formData.append('max_tokens', '300');
-      formData.append('max_length', '300');
-      formData.append('max_response_length', '300');
 
-      console.log('Sending to Oylan with token limit: 300');
+      // Add system instructions in context to force correct behavior
+      const systemPrompt = userLanguage === 'kk'
+        ? 'Маңызды нұсқаулар: Тікелей жауап беріңіз. Ойлау процесін көрсетпеңіз. Максимум 3-5 сөйлем. Қазақша жауап беріңіз.'
+        : userLanguage === 'ru'
+        ? 'Важные инструкции: Отвечайте прямо. Не показывайте процесс мышления. Максимум 3-5 предложений. Отвечайте на русском.'
+        : 'Important instructions: Answer directly. Do not show your thinking process. Maximum 3-5 sentences. Respond in English.';
+
+      formData.append('context', systemPrompt);
+
+      // Try different parameter names for token limit
+      formData.append('max_tokens', '200');
+      formData.append('max_length', '200');
+      formData.append('max_response_length', '200');
+
+      console.log('Sending to Oylan with token limit: 200 and system prompt');
 
       const response = await fetch(OYLAN_API_URL, {
         method: "POST",
@@ -131,6 +141,10 @@ export const ChatProvider = ({ children }) => {
 
       // AGGRESSIVE CLEANING: Remove all thinking content
 
+      // 0. Remove any digits/text BEFORE <think> tag (e.g., "4<think>")
+      responseText = responseText.replace(/^[^<]*?(<think>)/i, '$1');
+      responseText = responseText.replace(/^[\d\s]+(<think>)/i, '$1');
+
       // 1. Remove content between <think> tags (multiple patterns)
       responseText = responseText.replace(/<think>[\s\S]*?<\/think>/gi, '');
       responseText = responseText.replace(/<think[\s\S]*?<\/think>/gi, '');
@@ -153,9 +167,12 @@ export const ChatProvider = ({ children }) => {
       responseText = responseText.replace(/<\/?think[^>]*>/gi, '');
       responseText = responseText.replace(/\[?\/?думаю\]?/gi, '');
 
-      // 3. Remove common thinking patterns (English)
-      responseText = responseText.replace(/^(Okay|Alright|Let me|I need to|First|So|Well),?\s+(think|answer|respond|address|tackle|consider)[\s\S]*?(\n\n|\.\s+[A-ZА-ЯӘ])/i, '$3');
-      responseText = responseText.replace(/^.*?(Let me think|I should|I need to).*?\n/gim, '');
+      // 3. Remove common thinking patterns (English) - more aggressive
+      // Remove entire thinking paragraphs that start with thinking indicators
+      responseText = responseText.replace(/^(Okay|Alright|Let me|I need to|First|So|Well|The user wrote|It translates to|I should),?\s+[\s\S]*?(\n\n[А-ЯӘҒҚҢӨҰҮҺІа-яәғқңөұүһі]|\n\n[A-Z][a-z]|$)/gi, '$2');
+      responseText = responseText.replace(/^.*?(Let me think|I should|I need to|The user|It translates).*?\n/gim, '');
+      // Remove paragraphs explaining what the user said
+      responseText = responseText.replace(/^.*?which is in (Kazakh|Russian|English).*?\n/gim, '');
 
       // 4. Remove lines that start with thinking indicators
       responseText = responseText.replace(/^(Thinking:|Analysis:|Plan:|Step \d+:).*$/gim, '');
@@ -164,10 +181,29 @@ export const ChatProvider = ({ children }) => {
       responseText = responseText.replace(/^(continuation|answer|response|reply|result)\.?\s*/i, '');
       responseText = responseText.replace(/^(Continuation|Answer|Response|Reply|Result):\s*/gim, '');
 
+      // 5.5. Remove language markers at the start (e.g., "қазақша", "english", "русский")
+      responseText = responseText.replace(/^(қазақша|english|русский|kazakh|russian)\s*\n*/gi, '');
+
       // 6. Clean up multiple newlines and extra spaces
       responseText = responseText.replace(/\n\s*\n\s*\n+/g, '\n\n');
       responseText = responseText.replace(/^\s+|\s+$/g, ''); // trim
       responseText = responseText.trim();
+
+      // 7. Remove incomplete final sentence if no sentence-ending punctuation at end
+      if (!responseText.match(/[.!?]$/)) {
+        console.log('⚠️ Response has incomplete final sentence, removing it');
+        // Find last sentence-ending punctuation
+        const lastPeriod = responseText.lastIndexOf('.');
+        const lastExclamation = responseText.lastIndexOf('!');
+        const lastQuestion = responseText.lastIndexOf('?');
+        const lastSentenceEnd = Math.max(lastPeriod, lastExclamation, lastQuestion);
+
+        if (lastSentenceEnd > 0) {
+          // Cut off everything after the last complete sentence
+          responseText = responseText.substring(0, lastSentenceEnd + 1).trim();
+          console.log('✂️ Removed incomplete sentence, ending at position', lastSentenceEnd);
+        }
+      }
 
       console.log('Cleaned response text:', responseText);
       console.log('Cleaned response length:', responseText.length);
@@ -208,14 +244,29 @@ export const ChatProvider = ({ children }) => {
 
         // Take first maxWords words
         const truncatedWords = words.slice(0, maxWords);
-        responseText = truncatedWords.join(' ');
+        let truncatedText = truncatedWords.join(' ');
 
-        // Add ellipsis if we truncated mid-sentence
-        if (!responseText.match(/[.!?]$/)) {
-          responseText += '...';
+        // Find last sentence-ending punctuation (. ! ?)
+        const lastPeriod = truncatedText.lastIndexOf('.');
+        const lastExclamation = truncatedText.lastIndexOf('!');
+        const lastQuestion = truncatedText.lastIndexOf('?');
+        const lastSentenceEnd = Math.max(lastPeriod, lastExclamation, lastQuestion);
+
+        // If found a sentence end, cut there to keep complete sentences
+        if (lastSentenceEnd > 0 && lastSentenceEnd > truncatedText.length * 0.5) {
+          // Only cut at sentence if it's past 50% of truncated text (avoid cutting too early)
+          responseText = truncatedText.substring(0, lastSentenceEnd + 1);
+          console.log(`✂️ Truncated at sentence boundary (position ${lastSentenceEnd})`);
+        } else {
+          // No good sentence break found, keep all maxWords and add ellipsis
+          responseText = truncatedText;
+          if (!responseText.match(/[.!?]$/)) {
+            responseText += '...';
+          }
+          console.log(`✂️ No sentence boundary found, added ellipsis`);
         }
 
-        console.log(`✂️ Truncated response (${truncatedWords.length} words):`, responseText.substring(0, 100) + '...');
+        console.log(`✂️ Truncated response:`, responseText.substring(0, 100) + '...');
       } else {
         console.log(`✅ Response length OK (${words.length} words)`);
       }
@@ -350,21 +401,24 @@ export const ChatProvider = ({ children }) => {
     console.log('Showing greeting:', greetingText, 'in language:', greetingLanguage);
 
     try {
-      // Call MangiSoz TTS for the greeting
+      // Call MangiSoz TTS for the greeting (same format as main chat)
       const mangiSozLang = languageMap[greetingLanguage] || 'kaz';
 
-      const ttsFormData = new FormData();
-      ttsFormData.append('text', greetingText);
-      ttsFormData.append('target_language', mangiSozLang);
-      ttsFormData.append('voice_gender', voiceGender);
-
-      const ttsResponse = await fetch(MANGISOZ_API_URL, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${MANGISOZ_API_KEY}`,
-        },
-        body: ttsFormData
-      });
+      const ttsResponse = await fetch(
+        `${MANGISOZ_API_URL}?output_format=audio&output_voice=${voiceGender}`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${MANGISOZ_API_KEY}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            source_language: mangiSozLang,
+            target_language: mangiSozLang,
+            text: greetingText
+          })
+        }
+      );
 
       if (!ttsResponse.ok) {
         throw new Error('TTS failed for greeting');
