@@ -1,16 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { convertToWav } from '../utils/audioConverter';
 
-// MangiSoz STT API configuration
-const MANGISOZ_STT_API_URL = "/mangisoz-api/v1/transcript/transcript_audio/";
-const MANGISOZ_STT_API_KEY = "XUD5UQxZj5UtcZMglv7sjg";
-
-// Language mapping for MangiSoz
-const languageMap = {
-  'kk': 'kaz',
-  'ru': 'rus',
-  'en': 'eng'
-};
+// MangiSoz STT API configuration (NEW API)
+const MANGISOZ_STT_API_URL = "https://mangisoz.nu.edu.kz/backend/api/v1/stt/transcribe";
+const MANGISOZ_STT_API_KEY = "ak_vQ8znAxC0AITAbrlCWWqDEzciePmMDYKt2J0Ut4pdNk";
 
 export const useMangiSozSTT = (language = 'kk') => {
     const [isListening, setIsListening] = useState(false);
@@ -41,17 +34,19 @@ export const useMangiSozSTT = (language = 'kk') => {
         return hasMediaDevices && hasMediaRecorder;
     }, []);
 
-    // Send audio file to MangiSoz STT API
+    // Send audio file to MangiSoz STT API (NEW API format)
     const transcribeAudio = async (audioBlob) => {
         try {
             setIsProcessing(true);
-            console.log('Sending audio file to MangiSoz STT...');
+            console.log('=== MANGISOZ STT API CALL ===');
             console.log('Audio blob size:', audioBlob.size, 'type:', audioBlob.type);
 
-            // Create FormData and append the audio file
+            // Create FormData and append the audio file and language parameter
             const formData = new FormData();
-            formData.append('file', audioBlob, 'audio.wav');
+            formData.append('audio', audioBlob, 'audio.wav'); // Changed from 'file' to 'audio'
+            formData.append('language', 'auto'); // Auto-detect language
 
+            console.log('STT URL:', MANGISOZ_STT_API_URL);
             console.log('Sending request to MangiSoz STT API...');
 
             const sttStartTime = performance.now();
@@ -60,7 +55,7 @@ export const useMangiSozSTT = (language = 'kk') => {
                 {
                     method: "POST",
                     headers: {
-                        "Authorization": `Bearer ${MANGISOZ_STT_API_KEY}`
+                        "X-API-Key": MANGISOZ_STT_API_KEY
                         // Don't set Content-Type - browser will set it with boundary for FormData
                     },
                     body: formData
@@ -68,33 +63,33 @@ export const useMangiSozSTT = (language = 'kk') => {
             );
             const sttEndTime = performance.now();
             const sttTimeSeconds = ((sttEndTime - sttStartTime) / 1000).toFixed(2);
-            console.log('MangiSoz STT time:', sttTimeSeconds, 's');
 
-            console.log('MangiSoz STT response status:', response.status);
+            console.log('STT Response Status:', response.status);
+            console.log('STT Response Headers:', Object.fromEntries(response.headers.entries()));
+            console.log('MangiSoz STT time:', sttTimeSeconds, 's');
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('MangiSoz STT error response:', errorText);
+                console.error('❌ MangiSoz STT error response:', errorText);
                 throw new Error(`MangiSoz STT error: ${response.status} - ${errorText}`);
             }
 
             const data = await response.json();
-            console.log('MangiSoz STT response:', data);
+            console.log('STT Response data:', data);
             console.log('Response keys:', Object.keys(data));
-            console.log('Full response:', JSON.stringify(data, null, 2));
 
             // Try different possible response formats
             const transcribedText = data.transcription_text || data.text || data.transcript || data.transcription || data.result || '';
             console.log('Transcribed text:', transcribedText);
 
             if (!transcribedText) {
-                console.error('Could not find transcribed text in response. Response data:', data);
+                console.error('❌ Could not find transcribed text in response. Full response:', JSON.stringify(data, null, 2));
             }
 
             return { text: transcribedText.trim(), sttTime: sttTimeSeconds };
 
         } catch (error) {
-            console.error('Transcription error:', error);
+            console.error('❌ Transcription error:', error);
             throw error;
         } finally {
             setIsProcessing(false);

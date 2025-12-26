@@ -7,7 +7,7 @@ export const LandingPage = () => {
     const [selectedLanguage, setSelectedLanguage] = useState('kk');
     const [selectedAvatar, setSelectedAvatar] = useState('/models/64f1a714fe61576b46f27ca2.glb');
     const [selectedVoice, setSelectedVoice] = useState('female');
-    const [selectedEnvironment, setSelectedEnvironment] = useState('classroom');
+    const [selectedEnvironment, setSelectedEnvironment] = useState('classroom-warm');
 
     useEffect(() => {
         setIsVisible(true);
@@ -16,8 +16,14 @@ export const LandingPage = () => {
     const avatars = [
         {
             id: '/models/64f1a714fe61576b46f27ca2.glb',
-            name: 'Aigerim',
+            name: 'Айгерім',
             image: '👩‍🏫',
+            description: 'Professional Teacher'
+        },
+        {
+            id: '/models/64f1a714fe61576b46f27ca2.glb',
+            name: 'Мақсат',
+            image: '👨‍🏫',
             description: 'Professional Teacher'
         }
     ];
@@ -29,14 +35,10 @@ export const LandingPage = () => {
     ];
 
     const environments = [
-        { id: 'classroom', name: 'Classroom', icon: '🏫' },
-        { id: 'classroom-lowpoly', name: 'Low Poly Class', icon: '📚' },
-        { id: 'office', name: 'Modern Office (Simple)', icon: '🏢' },
-        { id: 'office-glb', name: 'Modern Office (GLB)', icon: '🗂️' },
+        { id: 'classroom-warm', name: 'Warm Classroom', icon: '🖼️' },
         { id: 'minimalistic_modern_office', name: 'Minimalistic Modern Office', icon: '🖥️' },
         { id: 'small_office', name: 'Small Office', icon: '🧾' },
-        { id: 'forest', name: 'Forest', icon: '🌲' },
-        { id: 'sunset-hdri', name: 'Soft Studio', icon: '🎛️' }
+        { id: 'forest', name: 'Forest', icon: '🌲' }
     ];
 
     const handleStartLearning = () => {
@@ -133,7 +135,7 @@ export const LandingPage = () => {
                             <h2 className="text-2xl font-bold mb-4 flex items-center">
                                 <span className="mr-2">👤</span> Select Your Avatar
                             </h2>
-                            <div className="flex justify-center">
+                            <div className="flex justify-center gap-6">
                                 {avatars.map((avatar) => (
                                     <button
                                         key={avatar.id}

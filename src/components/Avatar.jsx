@@ -124,43 +124,12 @@ export function Avatar({ modelPath = "/models/64f1a714fe61576b46f27ca2.glb", ...
     setLipsync(message.lipsync);
 
     // Handle audio from MangiSoz TTS
-    if (message.audio) {
+    if (message.audioUrl) {
       console.log('Avatar: Playing audio from MangiSoz');
-      console.log('Audio data length:', message.audio.length);
-      console.log('Audio preview:', message.audio.substring(0, 50) + '...');
+      console.log('Audio URL:', message.audioUrl);
 
-      // Convert HEX string to blob (MangiSoz returns HEX, not base64!)
       try {
-        // MangiSoz returns audio as HEX string, convert to bytes
-        const hexString = message.audio;
-        const bytes = new Uint8Array(hexString.length / 2);
-        for (let i = 0; i < hexString.length; i += 2) {
-          bytes[i / 2] = parseInt(hexString.substr(i, 2), 16);
-        }
-
-        console.log('Converted HEX to bytes, length:', bytes.length);
-
-        // Check WAV header - RIFF should be first 4 bytes
-        const header = String.fromCharCode(...bytes.slice(0, 4));
-        console.log('Audio header:', header);
-
-        // Try to auto-detect format or use multiple MIME types
-        let mimeType = 'audio/wav';
-        if (header === 'RIFF') {
-          mimeType = 'audio/wav';
-        } else if (bytes[0] === 0xFF && bytes[1] === 0xFB) {
-          mimeType = 'audio/mpeg';
-        }
-
-        console.log('Using MIME type:', mimeType);
-
-        const blob = new Blob([bytes], { type: mimeType });
-        const audioUrl = URL.createObjectURL(blob);
-
-        console.log('Created blob URL:', audioUrl);
-        console.log('Blob size:', blob.size);
-
-        const audio = new Audio(audioUrl);
+        const audio = new Audio(message.audioUrl);
         let hasEnded = false;
 
       const handleEnd = () => {
@@ -307,7 +276,7 @@ export function Avatar({ modelPath = "/models/64f1a714fe61576b46f27ca2.glb", ...
     }
 
     const appliedMorphTargets = [];
-    if (message && lipsync) {
+    if (message && lipsync && audio) {
       const currentAudioTime = audio.currentTime;
       for (let i = 0; i < lipsync.mouthCues.length; i++) {
         const mouthCue = lipsync.mouthCues[i];

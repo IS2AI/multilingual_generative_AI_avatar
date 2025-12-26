@@ -5,16 +5,12 @@ const OYLAN_ASSISTANT_ID = "793"; // Your assistant ID
 const OYLAN_API_URL = `/api/v1/assistant/${OYLAN_ASSISTANT_ID}/interactions/`;
 const OYLAN_API_KEY = "4zQPa23y.SXlAsiDq6CVPk0rDBM2ZXLsH3ClG04rf";
 
-// MangiSoz TTS API configuration
-const MANGISOZ_API_URL = "/mangisoz-api/v1/translate/text/";
-const MANGISOZ_API_KEY = "1lsF_GHGlMWM8AIrQjRVAA";
+// MangiSoz TTS API configuration (NEW API)
+const MANGISOZ_TTS_API_URL = "https://mangisoz.nu.edu.kz/backend/api/v1/tts/audio";
+const MANGISOZ_TTS_API_KEY = "ak_EaHGSZ_6oCV2DzAVET455FuHHIDSDpKvaCrmwm6REAw";
 
-// Language mapping for MangiSoz
-const languageMap = {
-  'kk': 'kaz',
-  'ru': 'rus',
-  'en': 'eng'
-};
+// MangiSoz STT API configuration (NEW API)
+const MANGISOZ_STT_API_KEY = "ak_vQ8znAxC0AITAbrlCWWqDEzciePmMDYKt2J0Ut4pdNk";
 
 const ChatContext = createContext();
 
@@ -64,6 +60,7 @@ export const ChatProvider = ({ children }) => {
   const [cameraZoomed, setCameraZoomed] = useState(false);
   const [performanceMetrics, setPerformanceMetrics] = useState(null);
   const [sttTime, setSttTime] = useState(0); // Store STT time
+  const [chatHistory, setChatHistory] = useState([]); // Store conversation history
 
   const chat = async (message, userLanguage = language, voiceSttTime = null) => {
     setLoading(true);
@@ -71,6 +68,14 @@ export const ChatProvider = ({ children }) => {
     console.log('Chat called with message:', message, 'language:', userLanguage);
     console.log('Voice STT time passed:', voiceSttTime);
     console.log('Current STT time state:', sttTime);
+
+    // Add user message to chat history
+    const userMessage = {
+      role: 'user',
+      text: message,
+      timestamp: new Date().toISOString()
+    };
+    setChatHistory(prev => [...prev, userMessage]);
 
     const startTime = performance.now();
     const currentSttTime = voiceSttTime !== null ? voiceSttTime : sttTime; // Use passed STT time or fallback to state
@@ -92,23 +97,22 @@ export const ChatProvider = ({ children }) => {
 
       const oylanStartTime = performance.now();
       const formData = new FormData();
-      formData.append('content', message);
 
-      // Add system instructions in context to force correct behavior
-      const systemPrompt = userLanguage === 'kk'
-        ? 'Маңызды нұсқаулар: Тікелей жауап беріңіз. Ойлау процесін көрсетпеңіз. Максимум 3-5 сөйлем. Қазақша жауап беріңіз.'
+      // Prepend instructions directly to user message since model ignores context parameter
+      const instructions = userLanguage === 'kk'
+        ? 'Маңызды нұсқау: <think> тегтерінде ағылшын тілінде ойлана аласыз, бірақ жауапты МІНДЕТТІ ТҮРДЕ қазақ тілінде, <think> тегтерінен ТЫС жазыңыз. Жауап қысқа болсын (2-3 сөйлем).\n\nСұрақ: '
         : userLanguage === 'ru'
-        ? 'Важные инструкции: Отвечайте прямо. Не показывайте процесс мышления. Максимум 3-5 предложений. Отвечайте на русском.'
-        : 'Important instructions: Answer directly. Do not show your thinking process. Maximum 3-5 sentences. Respond in English.';
+        ? 'Важная инструкция: можете размышлять на английском в тегах <think>, но ответ ОБЯЗАТЕЛЬНО пишите на русском языке ВНЕ тегов <think>. Ответ должен быть кратким (2-3 предложения).\n\nВопрос: '
+        : 'Important instruction: you can think in <think> tags, but write your answer in English OUTSIDE <think> tags. Keep answer brief (2-3 sentences).\n\nQuestion: ';
 
-      formData.append('context', systemPrompt);
+      formData.append('content', instructions + message);
 
-      // Try different parameter names for token limit
-      formData.append('max_tokens', '200');
-      formData.append('max_length', '200');
-      formData.append('max_response_length', '200');
+      // Remove token limits - let model think and respond fully
+      formData.append('max_tokens', '2048');
+      formData.append('max_length', '2048');
+      formData.append('max_response_length', '2048');
 
-      console.log('Sending to Oylan with token limit: 200 and system prompt');
+      console.log('Sending to Oylan with token limit: 2048 (unlimited), instructions in message');
 
       const response = await fetch(OYLAN_API_URL, {
         method: "POST",
@@ -135,35 +139,35 @@ export const ChatProvider = ({ children }) => {
 
       // Extract text from response
       let responseText = data.response?.content || "No response";
+      const rawResponseText = responseText;
 
       console.log('Raw response text:', responseText);
       console.log('Raw response length:', responseText.length);
 
-      // AGGRESSIVE CLEANING: Remove all thinking content
+      // IMPROVED CLEANING: Extract only user-facing content (outside <think> tags)
+      console.log('🧹 Starting to clean thinking tags...');
 
-      // 0. Remove any digits/text BEFORE <think> tag (e.g., "4<think>")
-      responseText = responseText.replace(/^[^<]*?(<think>)/i, '$1');
-      responseText = responseText.replace(/^[\d\s]+(<think>)/i, '$1');
-
-      // 1. Remove content between <think> tags (multiple patterns)
+      // 1. Remove all complete <think>...</think> blocks (with their content)
+      const beforeRemoval = responseText;
       responseText = responseText.replace(/<think>[\s\S]*?<\/think>/gi, '');
-      responseText = responseText.replace(/<think[\s\S]*?<\/think>/gi, '');
-      responseText = responseText.replace(/\[думаю\][\s\S]*?\[\/думаю\]/gi, '');
+      if (beforeRemoval !== responseText) {
+        console.log('✂️ Removed complete <think>...</think> blocks');
+      }
 
-      // 2. Handle orphaned closing tags - remove everything BEFORE </think>
-      if (responseText.includes('</think>') && !responseText.includes('<think>')) {
-        console.log('⚠️ Found orphaned </think> tag - removing everything before it');
+      // 2. Handle orphaned closing </think> tag - remove everything BEFORE it
+      if (responseText.includes('</think>')) {
+        console.log('⚠️ Found orphaned </think> tag - keeping only content after it');
         const parts = responseText.split('</think>');
         responseText = parts[parts.length - 1]; // Keep only what's after the last </think>
       }
 
-      // 3. Handle orphaned opening tags - remove everything AFTER <think>
-      if (responseText.includes('<think>') && !responseText.includes('</think>')) {
+      // 3. Handle orphaned opening <think> tag - remove everything FROM it onwards
+      if (responseText.includes('<think>')) {
         console.log('⚠️ Found orphaned <think> tag - removing everything after it');
-        responseText = responseText.split('<think>')[0]; // Keep only what's before <think>
+        responseText = responseText.split('<think>')[0]; // Keep only what's BEFORE <think>
       }
 
-      // 4. Remove any remaining tags
+      // 4. Remove any remaining stray tags
       responseText = responseText.replace(/<\/?think[^>]*>/gi, '');
       responseText = responseText.replace(/\[?\/?думаю\]?/gi, '');
 
@@ -190,8 +194,10 @@ export const ChatProvider = ({ children }) => {
       responseText = responseText.trim();
 
       // 7. Remove incomplete final sentence if no sentence-ending punctuation at end
-      if (!responseText.match(/[.!?]$/)) {
-        console.log('⚠️ Response has incomplete final sentence, removing it');
+      // If we already have Cyrillic content, avoid over-trimming; otherwise trim incomplete short endings
+      const hasCyrillic = /[А-Яа-яӘәҒғҚқҢңӨөҰұҮүҺһІі]/.test(responseText);
+      if (!hasCyrillic && !responseText.match(/[.!?]$/) && responseText.length <= 200) {
+        console.log('⚠️ Response has incomplete final sentence, removing it (short text, non-Cyrillic)');
         // Find last sentence-ending punctuation
         const lastPeriod = responseText.lastIndexOf('.');
         const lastExclamation = responseText.lastIndexOf('!');
@@ -205,11 +211,53 @@ export const ChatProvider = ({ children }) => {
         }
       }
 
+      // Prefer only the user-facing sentences in target script (avoid English reasoning leakage)
+      const sentences = responseText.split(/(?<=[.!?])\s+/).filter(Boolean);
+      console.log('📝 Total sentences found:', sentences.length);
+      console.log('📝 Sentences:', sentences);
+
+      // For Kazakh/Russian, filter for sentences that are PRIMARILY Cyrillic (>50% of letters are Cyrillic)
+      if (userLanguage === 'kk' || userLanguage === 'ru') {
+        const cyrillicSentences = sentences.filter(s => {
+          const cyrillicLetters = (s.match(/[А-Яа-яӘәҒғҚқҢңӨөҰұҮүҺһІі]/g) || []).length;
+          const latinLetters = (s.match(/[A-Za-z]/g) || []).length;
+          console.log(`  - Sentence: "${s.substring(0, 50)}..." | Cyrillic: ${cyrillicLetters}, Latin: ${latinLetters}`);
+          return cyrillicLetters > latinLetters; // More Cyrillic than Latin
+        });
+
+        console.log('✅ Cyrillic sentences after filter:', cyrillicSentences.length);
+
+        if (cyrillicSentences.length > 0) {
+          responseText = cyrillicSentences.join(' ').trim();
+          console.log('✂️ Using Cyrillic sentences only to avoid English reasoning');
+
+          // Check if response contains Chinese characters - model sometimes responds in Chinese
+          const hasChinese = /[\u4e00-\u9fa5]/.test(responseText);
+          if (hasChinese) {
+            console.warn('⚠️ Model responded in Chinese instead of Kazakh/Russian! Using fallback.');
+            responseText = userLanguage === 'kk'
+              ? 'Кешіріңіз, мен сұрағыңызды түсінбедім. Басқаша қойып көріңіз.'
+              : userLanguage === 'ru'
+              ? 'Извините, я не понял ваш вопрос. Попробуйте переформулировать.'
+              : 'Sorry, I did not understand your question. Please try rephrasing.';
+          }
+        } else {
+          // No valid Cyrillic sentences found - use greeting fallback
+          console.warn('⚠️ No valid Cyrillic sentences found, using greeting fallback');
+          console.warn('⚠️ This means model generated only English thinking or empty response');
+          responseText = userLanguage === 'kk'
+            ? 'Кешіріңіз, мен сұрағыңызды түсінбедім. Басқаша қойып көріңіз.'
+            : userLanguage === 'ru'
+            ? 'Извините, я не понял ваш вопрос. Попробуйте переформулировать.'
+            : 'Sorry, I did not understand your question. Please try rephrasing.';
+        }
+      }
+
       console.log('Cleaned response text:', responseText);
       console.log('Cleaned response length:', responseText.length);
 
       // Detect language of response
-      const detectedLang = detectLanguage(responseText) || userLanguage;
+      let detectedLang = detectLanguage(responseText) || userLanguage;
       console.log('Detected language:', detectedLang);
       console.log('Expected language:', userLanguage);
 
@@ -217,17 +265,50 @@ export const ChatProvider = ({ children }) => {
       const thinkingIndicators = /\b(then|first|next|after|but wait|maybe|should i|perhaps|also|finally|wait|oh)\b.*\b(the|a|an|to|for|with|from)\b/i;
       const isStillThinking = detectedLang === 'en' && userLanguage !== 'en' && thinkingIndicators.test(responseText);
 
-      // If response is empty, too short, or still thinking content, provide fallback
-      if (!responseText || responseText.length < 5 || isStillThinking) {
+      // If response is empty, too short, wrong language, or still thinking content, provide fallback
+      const hasOrphanThink = rawResponseText.includes('<think>') && !rawResponseText.includes('</think>');
+      const looksTruncated = responseText.trim().startsWith('*') || responseText.trim().length < 15;
+      const languageMismatch = detectedLang !== userLanguage && userLanguage !== 'en';
+
+      if (!responseText || responseText.length < 5 || isStillThinking || looksTruncated || languageMismatch) {
         if (isStillThinking) {
           console.warn('⚠️ Response is still thinking content in English! Using fallback.');
+        } else if (looksTruncated) {
+          console.warn('⚠️ Response too short or truncated after cleaning, using fallback');
+        } else if (languageMismatch) {
+          console.warn('⚠️ Language mismatch, using friendly or math fallback');
         } else {
           console.warn('Response too short after cleaning, using fallback');
         }
 
-        responseText = userLanguage === 'kk' ? 'Кешіріңіз, жауап беру мүмкін болмады. Сұрағыңызды қайталап көріңіз.' :
-                       userLanguage === 'ru' ? 'Извините, не смог ответить. Попробуйте переформулировать вопрос.' :
-                       'Sorry, could not respond. Please try rephrasing your question.';
+        const friendlyFallback = userLanguage === 'kk'
+          ? 'Сәлем! Сізге қалай көмектесе аламын?'
+          : userLanguage === 'ru'
+          ? 'Привет! Чем могу помочь?'
+          : 'Hi! How can I help you?';
+        const errorFallback = userLanguage === 'kk'
+          ? 'Кешіріңіз, жауап беру мүмкін болмады. Сұрағыңызды қайталап көріңіз.'
+          : userLanguage === 'ru'
+          ? 'Извините, не смог ответить. Попробуйте переформулировать вопрос.'
+          : 'Sorry, could not respond. Please try rephrasing your question.';
+
+        // Simple numeric root detector to salvage math answers when language mismatches
+        const mentionsRoot = /(түбір|root|sqrt)/i.test(message || '');
+        const numMatch = (message || '').match(/-?\d+(\.\d+)?/);
+        let mathFallback = null;
+        if ((languageMismatch || isStillThinking) && mentionsRoot && numMatch) {
+          const num = parseFloat(numMatch[0]);
+          const root = Math.sqrt(Math.abs(num));
+          mathFallback = userLanguage === 'kk'
+            ? `${num} санының түбірі ${root}.`
+            : userLanguage === 'ru'
+            ? `Квадратный корень из ${num} равен ${root}.`
+            : `The square root of ${num} is ${root}.`;
+        }
+
+        responseText = mathFallback || (hasOrphanThink ? friendlyFallback : errorFallback);
+        // Align TTS language with synthesized text
+        detectedLang = userLanguage;
       }
 
       // Truncate response to ~300 tokens (approximately 150 words for safety)
@@ -273,87 +354,96 @@ export const ChatProvider = ({ children }) => {
 
       console.log(`Final response word count: ${responseText.split(/\s+/).filter(w => w.length > 0).length}`);
 
-      // Call MangiSoz TTS API to generate audio
-      console.log('Calling MangiSoz TTS API...');
-      const mangiSozStartTime = performance.now();
-      const mangiSozLang = languageMap[detectedLang] || 'eng';
-      console.log('MangiSoz language:', mangiSozLang);
-      console.log('Voice gender:', voiceGender);
-      console.log('Text to convert:', responseText.substring(0, 100));
+      // Call MangiSoz TTS API (NEW API format)
+      console.log('=== MANGISOZ TTS API CALL ===');
+      const ttsStartTime = performance.now();
 
-      const ttsResponse = await fetch(
-        `${MANGISOZ_API_URL}?output_format=audio&output_voice=${voiceGender}`,
-        {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${MANGISOZ_API_KEY}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            source_language: mangiSozLang,
-            target_language: mangiSozLang,
-            text: responseText
-          })
-        }
-      );
+      console.log('TTS URL:', MANGISOZ_TTS_API_URL);
+      console.log('TTS Language:', detectedLang);
+      console.log('TTS Voice Gender:', voiceGender);
+      console.log('TTS Text (first 100 chars):', responseText.substring(0, 100));
 
-      const mangiSozEndTime = performance.now();
-      metrics.mangiSozTime = ((mangiSozEndTime - mangiSozStartTime) / 1000).toFixed(2);
+      // Prepare form data (application/x-www-form-urlencoded)
+      const ttsParams = new URLSearchParams();
+      ttsParams.append('text', responseText);
+      ttsParams.append('lang', detectedLang); // 'kk', 'ru', or 'en'
+      ttsParams.append('speaker', voiceGender); // 'female' or 'male'
 
-      console.log('MangiSoz API response status:', ttsResponse.status);
-      console.log('MangiSoz API time:', metrics.mangiSozTime, 's');
+      const ttsResponse = await fetch(MANGISOZ_TTS_API_URL, {
+        method: "POST",
+        headers: {
+          "X-API-Key": MANGISOZ_TTS_API_KEY,
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: ttsParams.toString()
+      });
+
+      const ttsEndTime = performance.now();
+      metrics.mangiSozTime = ((ttsEndTime - ttsStartTime) / 1000).toFixed(2);
+
+      console.log('TTS Response Status:', ttsResponse.status);
+      console.log('TTS Response Headers:', Object.fromEntries(ttsResponse.headers.entries()));
+      console.log('TTS Time:', metrics.mangiSozTime, 's');
 
       if (!ttsResponse.ok) {
         const errorText = await ttsResponse.text();
-        console.error('MangiSoz API error response:', errorText);
-        throw new Error(`MangiSoz TTS error! status: ${ttsResponse.status}, details: ${errorText}`);
+        console.error('❌ MangiSoz TTS API error:', errorText);
+        throw new Error(`MangiSoz TTS failed: ${ttsResponse.status} - ${errorText}`);
       }
 
-      const ttsData = await ttsResponse.json();
-      console.log('MangiSoz TTS response received:', {
-        hasAudio: !!ttsData.audio,
-        audioLength: ttsData.audio ? ttsData.audio.length : 0,
-        audioPreview: ttsData.audio ? ttsData.audio.substring(0, 50) + '...' : 'null'
-      });
+      // Response is audio binary data
+      const audioBlob = await ttsResponse.blob();
+      console.log('Audio blob size:', audioBlob.size, 'bytes');
+      console.log('Audio blob type:', audioBlob.type);
 
-      // Extract audio from response
-      const audioBase64 = ttsData.audio;
+      // Create blob URL for direct playback (more efficient than base64)
+      const audioUrl = URL.createObjectURL(audioBlob);
+      console.log('Audio blob URL:', audioUrl);
 
-      if (!audioBase64) {
-        console.error('No audio in MangiSoz response!', ttsData);
-        throw new Error('MangiSoz did not return audio data');
-      }
-
-      // Calculate estimated speech duration based on audio
+      // Calculate estimated speech duration
       const wordCount = responseText.split(/\s+/).length;
-      const estimatedDuration = (wordCount / 150) * 60; // in seconds
+      const estimatedDuration = (wordCount / 150) * 60; // ~150 words per minute
       metrics.audioDuration = estimatedDuration.toFixed(2);
 
-      // Generate lipsync
+      console.log('Estimated audio duration:', metrics.audioDuration, 's');
+
+      // Generate lipsync data
       const lipsync = generateLipsync(responseText, estimatedDuration);
 
-      // Calculate total time (STT + Oylan + TTS)
-      const endTime = performance.now();
-      const calculatedTotal = parseFloat(metrics.sttTime) + parseFloat(metrics.oylanTime) + parseFloat(metrics.mangiSozTime);
-      metrics.totalTime = calculatedTotal.toFixed(2);
-
-      // Set metrics and reset STT time AFTER setting metrics
-      setPerformanceMetrics(metrics);
-      console.log('Performance metrics:', metrics);
-      setSttTime(0); // Reset STT time for next request
-
-      // Prepare response message with audio
-      const responseMessage = {
+      // Add AI response to chat history
+      const aiMessage = {
+        role: 'assistant',
         text: responseText,
-        audio: audioBase64, // Base64 audio from MangiSoz
-        lipsync: lipsync,
+        timestamp: new Date().toISOString()
+      };
+      setChatHistory(prev => [...prev, aiMessage]);
+
+      // Calculate total time
+      const endTime = performance.now();
+      metrics.totalTime = ((endTime - startTime) / 1000).toFixed(2);
+
+      console.log('=== PERFORMANCE METRICS ===');
+      console.log('Total Time:', metrics.totalTime, 's');
+      console.log('STT Time:', metrics.sttTime, 's');
+      console.log('Oylan LLM Time:', metrics.oylanTime, 's');
+      console.log('MangiSoz TTS Time:', metrics.mangiSozTime, 's');
+      console.log('Audio Duration:', metrics.audioDuration, 's');
+
+      setPerformanceMetrics(metrics);
+
+      // Create message with audio
+      const messageWithAudio = {
+        text: responseText,
+        audioUrl: audioUrl, // Use blob URL instead of base64
+        useTTS: true,
         animation: "Talking_1",
-        facialExpression: "default",
-        estimatedDuration: estimatedDuration
+        facialExpression: "smile",
+        lipsync: lipsync
       };
 
-      console.log('Setting response message with audio');
-      setMessages((messages) => [...messages, responseMessage]);
+      console.log('Setting message with audio');
+      setMessages((messages) => [...messages, messageWithAudio]);
+      setLoading(false);
 
     } catch (err) {
       console.error('Chat error:', err);
@@ -401,35 +491,28 @@ export const ChatProvider = ({ children }) => {
     console.log('Showing greeting:', greetingText, 'in language:', greetingLanguage);
 
     try {
-      // Call MangiSoz TTS for the greeting (same format as main chat)
-      const mangiSozLang = languageMap[greetingLanguage] || 'kaz';
+      // Call MangiSoz TTS for the greeting (NEW API format)
+      const ttsParams = new URLSearchParams();
+      ttsParams.append('text', greetingText);
+      ttsParams.append('lang', greetingLanguage); // 'kk', 'ru', or 'en' directly
+      ttsParams.append('speaker', voiceGender);
 
-      const ttsResponse = await fetch(
-        `${MANGISOZ_API_URL}?output_format=audio&output_voice=${voiceGender}`,
-        {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${MANGISOZ_API_KEY}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            source_language: mangiSozLang,
-            target_language: mangiSozLang,
-            text: greetingText
-          })
-        }
-      );
+      const ttsResponse = await fetch(MANGISOZ_TTS_API_URL, {
+        method: "POST",
+        headers: {
+          "X-API-Key": MANGISOZ_TTS_API_KEY,
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: ttsParams.toString()
+      });
 
       if (!ttsResponse.ok) {
         throw new Error('TTS failed for greeting');
       }
 
-      const ttsData = await ttsResponse.json();
-      const audioBase64 = ttsData.audio;
-
-      if (!audioBase64) {
-        throw new Error('No audio in greeting TTS');
-      }
+      // Create blob URL for direct playback
+      const audioBlob = await ttsResponse.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
 
       // Estimate duration
       const wordCount = greetingText.split(/\s+/).length;
@@ -441,7 +524,7 @@ export const ChatProvider = ({ children }) => {
       // Show greeting message
       const greetingMessage = {
         text: greetingText,
-        audio: audioBase64,
+        audioUrl: audioUrl, // Use blob URL instead of base64
         lipsync: lipsync,
         animation: "Talking_1",
         facialExpression: "smile",
@@ -481,6 +564,7 @@ export const ChatProvider = ({ children }) => {
         setVoiceGender,
         performanceMetrics,
         setSttTime,
+        chatHistory,
       }}
     >
       {children}

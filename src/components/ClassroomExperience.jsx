@@ -5,6 +5,8 @@ import {
     Text,
     Plane,
     Box,
+    Circle,
+    Cylinder,
     useGLTF,
 } from "@react-three/drei";
 import { Suspense, useEffect, useRef, useState } from "react";
@@ -51,47 +53,22 @@ const Dots = (props) => {
 const Whiteboard = () => {
     return (
         <group position={[0, 1.6, -2.4]}>
-            <Box args={[3.6, 2.3, 0.08]} position={[0, 0, -0.05]}>
-                <meshStandardMaterial color="#111827" />
+            {/* Frame */}
+            <Box args={[3.8, 2.4, 0.08]} position={[0, 0, -0.05]}>
+                <meshStandardMaterial color="#5b4636" />
             </Box>
-            <Plane args={[3.4, 2]} position={[0, 0, 0]}>
-                <meshStandardMaterial color="#1f2937" />
+            {/* Board */}
+            <Plane args={[3.5, 2.1]} position={[0, 0, 0]}>
+                <meshStandardMaterial color="#1f5132" />
             </Plane>
             <Text
-                position={[0, 0.55, 0.02]}
-                fontSize={0.16}
-                color="#d1fae5"
+                position={[0, 0.35, 0.02]}
+                fontSize={0.24}
+                color="#fef3c7"
                 anchorX="center"
                 anchorY="middle"
             >
-                Quantum Mechanics 101
-            </Text>
-            <Text
-                position={[-1.35, 0.2, 0.02]}
-                fontSize={0.1}
-                color="#a5b4fc"
-                anchorX="left"
-                anchorY="middle"
-            >
-                • Wave-Particle Duality
-            </Text>
-            <Text
-                position={[-1.35, -0.05, 0.02]}
-                fontSize={0.1}
-                color="#fbbf24"
-                anchorX="left"
-                anchorY="middle"
-            >
-                • Uncertainty Principle
-            </Text>
-            <Text
-                position={[-1.35, -0.3, 0.02]}
-                fontSize={0.1}
-                color="#34d399"
-                anchorX="left"
-                anchorY="middle"
-            >
-                • Schrödinger Equation
+                ISSAI Avatar
             </Text>
         </group>
     );
@@ -109,7 +86,7 @@ const ClassroomDesks = () => {
                 <group key={index} position={position}>
                     {/* Desk surface */}
                     <Box args={[1, 0.1, 0.6]} position={[0, 0.75, 0]}>
-                        <meshStandardMaterial color="#d97706" />
+                        <meshStandardMaterial color="#c47a2c" />
                     </Box>
                     {/* Desk legs */}
                     <Box args={[0.05, 0.7, 0.05]} position={[-0.4, 0.35, -0.25]}>
@@ -139,9 +116,9 @@ const ClassroomDesks = () => {
 
 const ClassroomFloor = () => {
     return (
-        <Plane args={[22, 22]} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-            <meshStandardMaterial color="#f1ede6" />
-        </Plane>
+            <Plane args={[22, 22]} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+                <meshStandardMaterial color="#d8c8b4" />
+            </Plane>
     );
 };
 
@@ -150,15 +127,15 @@ const ClassroomWalls = () => {
         <group>
             {/* Back wall */}
             <Plane args={[20, 8]} position={[0, 4, -6]} rotation={[0, 0, 0]}>
-                <meshStandardMaterial color="#e8ecf7" />
+                <meshStandardMaterial color="#f3ebdf" />
             </Plane>
             {/* Left wall */}
             <Plane args={[12, 8]} position={[-11, 4, 0]} rotation={[0, Math.PI / 2, 0]}>
-                <meshStandardMaterial color="#eef1f7" />
+                <meshStandardMaterial color="#eaddcf" />
             </Plane>
             {/* Right wall */}
             <Plane args={[12, 8]} position={[11, 4, 0]} rotation={[0, -Math.PI / 2, 0]}>
-                <meshStandardMaterial color="#eef1f7" />
+                <meshStandardMaterial color="#eaddcf" />
             </Plane>
         </group>
     );
@@ -167,47 +144,132 @@ const ClassroomWalls = () => {
 const ClassroomDecor = () => {
     const windowY = 3;
     const windowZ = -5.99;
-    const posters = [
-        { pos: [-4, 2.8, -5.01], color: "#bfdbfe", text: "Physics Club" },
-        { pos: [4, 2.2, -5.01], color: "#fecdd3", text: "Lab Safety" }
-    ];
-
     return (
         <group>
             {/* Windows */}
             {[-5, 5].map((x, i) => (
                 <group key={i} position={[x, windowY, windowZ]}>
                     <Plane args={[3.2, 2]} position={[0, 0, 0]}>
-                        <meshStandardMaterial color="#c7e0ff" transparent opacity={0.5} />
+                        <meshStandardMaterial color="#cde4ff" transparent opacity={0.55} />
                     </Plane>
                     <Box args={[3.3, 2.1, 0.06]} position={[0, 0, -0.03]}>
-                        <meshStandardMaterial color="#cbd5e1" />
+                        <meshStandardMaterial color="#c9c2b8" />
                     </Box>
                 </group>
             ))}
 
             {/* Wall stripe */}
             <Plane args={[20, 1.4]} position={[0, 1.8, -5.01]} rotation={[0, 0, 0]}>
-                <meshStandardMaterial color="#dbeafe" />
+                <meshStandardMaterial color="#d1c7b8" />
             </Plane>
-
-            {/* Posters */}
-            {posters.map((p, idx) => (
-                <group key={idx} position={p.pos}>
-                    <Plane args={[2, 1.2]} position={[0, 0, 0]}>
-                        <meshStandardMaterial color={p.color} />
-                    </Plane>
-                    <Text position={[0, 0, 0.02]} fontSize={0.18} color="#111827" anchorX="center" anchorY="middle">
-                        {p.text}
-                    </Text>
-                </group>
-            ))}
 
             {/* Ceiling lights (emissive panels) */}
             {[-3.5, 3.5].map((x, idx) => (
                 <Box key={idx} args={[3, 0.1, 1.2]} position={[x, 7.4, -1]}>
                     <meshStandardMaterial color="#e5e7eb" emissive="#fefce8" emissiveIntensity={0.8} />
                 </Box>
+            ))}
+
+            {/* Bulletin board (blank) */}
+            <group position={[0, 2.2, 5.8]}>
+                <Box args={[3, 1.8, 0.08]} position={[0, 0, -0.04]}>
+                    <meshStandardMaterial color="#5b4636" />
+                </Box>
+                <Plane args={[2.7, 1.5]} position={[0, 0, 0]}>
+                    <meshStandardMaterial color="#f5e6c5" />
+                </Plane>
+            </group>
+
+            {/* Clock above board */}
+            <group position={[0, 6.5, -5.05]}>
+                <Circle args={[0.4, 32]} rotation={[0, 0, 0]}>
+                    <meshStandardMaterial color="#f5f5f4" />
+                </Circle>
+                <Box args={[0.02, 0.35, 0.02]} position={[0, 0.15, 0.02]}>
+                    <meshStandardMaterial color="#1f2937" />
+                </Box>
+                <Box args={[0.25, 0.02, 0.02]} position={[0.1, 0, 0.02]}>
+                    <meshStandardMaterial color="#1f2937" />
+                </Box>
+            </group>
+
+            {/* Bookshelf */}
+            <group position={[-7.5, 1.5, -3]}>
+                <Box args={[2, 3, 0.6]} position={[0, 1.5, 0]}>
+                    <meshStandardMaterial color="#6b553f" />
+                </Box>
+                {[0.5, 1.5, 2.5].map((y, idx) => (
+                    <Plane key={idx} args={[1.8, 0.05]} position={[0, y, 0.31]} rotation={[0, 0, 0]}>
+                        <meshStandardMaterial color="#8c7158" />
+                    </Plane>
+                ))}
+                {/* Books */}
+                {[[-0.6, 0.8], [-0.2, 0.8], [0.2, 0.8], [0.6, 0.8]].map((pos, idx) => (
+                    <Box key={`b1-${idx}`} args={[0.15, 0.8, 0.3]} position={[pos[0], pos[1], 0.2]}>
+                        <meshStandardMaterial color={idx % 2 === 0 ? "#3b82f6" : "#f97316"} />
+                    </Box>
+                ))}
+                {[[-0.5, 1.8], [0, 1.8], [0.5, 1.8]].map((pos, idx) => (
+                    <Box key={`b2-${idx}`} args={[0.18, 0.9, 0.3]} position={[pos[0], pos[1], 0.2]}>
+                        <meshStandardMaterial color={idx % 2 === 0 ? "#10b981" : "#f59e0b"} />
+                    </Box>
+                ))}
+            </group>
+
+            {/* Teacher desk behind avatar */}
+            <group position={[0, 0, 4.5]}>
+                <Box args={[4, 0.2, 1.5]} position={[0, 1, 0]}>
+                    <meshStandardMaterial color="#d2c3b3" />
+                </Box>
+                <Box args={[0.2, 1.0, 1.5]} position={[-1.9, 0.5, 0]}>
+                    <meshStandardMaterial color="#b8a28d" />
+                </Box>
+                <Box args={[0.2, 1.0, 1.5]} position={[1.9, 0.5, 0]}>
+                    <meshStandardMaterial color="#b8a28d" />
+                </Box>
+                {/* Chair */}
+                <group position={[0.8, 0, -0.6]}>
+                    <Box args={[0.6, 0.05, 0.6]} position={[0, 0.4, 0]}>
+                        <meshStandardMaterial color="#4b5563" />
+                    </Box>
+                    <Box args={[0.6, 0.8, 0.1]} position={[0, 0.8, -0.25]}>
+                        <meshStandardMaterial color="#6b7280" />
+                    </Box>
+                </group>
+                {/* Desk items */}
+                <Box args={[0.8, 0.05, 0.5]} position={[-0.6, 1.25, 0]}>
+                    <meshStandardMaterial color="#1f2937" />
+                </Box>
+                <Box args={[0.5, 0.12, 0.35]} position={[0.5, 1.15, 0.2]}>
+                    <meshStandardMaterial color="#fcd34d" />
+                </Box>
+                <Box args={[0.15, 0.15, 0.15]} position={[0.1, 1.2, -0.2]}>
+                    <meshStandardMaterial color="#ef4444" />
+                </Box>
+                {/* Lamp */}
+                <group position={[1.2, 1.1, 0]}>
+                    <Box args={[0.1, 0.5, 0.1]} position={[0, 0.25, 0]}>
+                        <meshStandardMaterial color="#94a3b8" />
+                    </Box>
+                    <Box args={[0.25, 0.15, 0.25]} position={[0, 0.55, 0]}>
+                        <meshStandardMaterial color="#e0f2fe" emissive="#e0f2fe" emissiveIntensity={0.5} />
+                    </Box>
+                </group>
+            </group>
+
+            {/* Plants near board sides */}
+            {[[-4.5, 0, -1.5], [4.5, 0, -1.5]].map((pos, idx) => (
+                <group key={idx} position={pos}>
+                    <Cylinder args={[0.4, 0.4, 0.4, 12]} position={[0, 0.2, 0]}>
+                        <meshStandardMaterial color="#4b5563" />
+                    </Cylinder>
+                    <Box args={[0.15, 1.2, 0.15]} position={[0, 1, 0]}>
+                        <meshStandardMaterial color="#8f6e4d" />
+                    </Box>
+                    <Box args={[1.2, 0.5, 1.2]} position={[0, 1.6, 0]}>
+                        <meshStandardMaterial color="#3f8c55" />
+                    </Box>
+                </group>
             ))}
         </group>
     );
@@ -216,10 +278,10 @@ const ClassroomDecor = () => {
 const ClassroomLighting = () => {
     return (
         <>
-            <ambientLight intensity={0.5} color="#eef2ff" />
+            <ambientLight intensity={0.55} color="#f4efe6" />
             <directionalLight
                 position={[6, 10, 6]}
-                intensity={1}
+                intensity={1.05}
                 castShadow
                 shadow-mapSize-width={2048}
                 shadow-mapSize-height={2048}
@@ -397,7 +459,8 @@ const StudioStage = () => {
 // Environment GLB configurations
 const environmentModels = {
     // Built-in classroom (uses planes/boxes)
-    'classroom': { type: 'builtin-classroom', backgroundColor: '#f4f6fb' },
+    'classroom': { type: 'builtin-classroom', backgroundColor: '#f7efe3' },
+    'classroom-warm': { type: 'builtin-classroom', backgroundColor: '#f7efe3' },
     'classroom-lowpoly': {
         type: 'glb',
         path: '/environments/classroom-lowpoly.glb',
@@ -429,15 +492,15 @@ const environmentModels = {
     'minimalistic_modern_office': {
         type: 'glb',
         path: '/environments/minimalistic_modern_office.glb',
-        position: [0, -1.2, -6],
-        scale: 1.2,
+        position: [2.1, 1.3, 0],
+        scale: 0.9,
         rotation: [0, Math.PI, 0],
-        backgroundColor: '#e9edf5'
+        backgroundColor: '#dfe4eb'
     },
     'small_office': {
         type: 'glb',
         path: '/environments/small_office.glb',
-        position: [0, -1.5, -5.5],
+        position: [0, 1.3, 0],
         scale: 1.1,
         rotation: [0, Math.PI, 0],
         backgroundColor: '#e8ecf5'
@@ -464,19 +527,32 @@ export const ClassroomExperience = ({ userAvatar, selectedEnvironment = 'classro
     const cameraControls = useRef();
     const { cameraZoomed } = useChat();
     const envConfig = environmentModels[selectedEnvironment] || environmentModels['classroom'];
+    const isSmallOffice = selectedEnvironment === 'small_office';
 
     useEffect(() => {
         // Set initial camera position for classroom view - focused on main avatar
-        cameraControls.current.setLookAt(0, 2, 5, 0, 1.5, 0);
+        if (isSmallOffice) {
+            cameraControls.current.setLookAt(0, 2, -5, 0, 1.5, 0);
+        } else {
+            cameraControls.current.setLookAt(0, 2, 5, 0, 1.5, 0);
+        }
     }, []);
 
     useEffect(() => {
         if (cameraZoomed) {
             // Zoom in to avatar for close interaction
-            cameraControls.current.setLookAt(0, 1.5, 1.5, 0, 1.5, 0, true);
+            if (isSmallOffice) {
+                cameraControls.current.setLookAt(0, 1.5, -1.5, 0, 1.5, 0, true);
+            } else {
+                cameraControls.current.setLookAt(0, 1.5, 1.5, 0, 1.5, 0, true);
+            }
         } else {
             // Full classroom view with avatar in focus
-            cameraControls.current.setLookAt(0, 2.2, 5, 0, 1.0, 0, true);
+            if (isSmallOffice) {
+                cameraControls.current.setLookAt(0, 2.2, -5, 0, 1.0, 0, true);
+            } else {
+                cameraControls.current.setLookAt(0, 2.2, 5, 0, 1.0, 0, true);
+            }
         }
     }, [cameraZoomed]);
 
@@ -540,6 +616,7 @@ export const ClassroomExperience = ({ userAvatar, selectedEnvironment = 'classro
                     modelPath={userAvatar}
                     position={[0, 0, 0]}
                     scale={1}
+                    rotation={isSmallOffice ? [0, Math.PI, 0] : [0, 0, 0]}
                 />
             </Suspense>
 
