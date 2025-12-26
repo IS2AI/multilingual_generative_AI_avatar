@@ -33,7 +33,10 @@ export const ClassroomPage = () => {
             <Leva hidden />
             <ClassroomUI userInfo={selections}>
                 <Canvas shadows camera={{ position: [0, 2, 5], fov: 45 }}>
-                    <ClassroomExperience selectedAvatar={selections.avatar} />
+                    <ClassroomExperience
+                        userAvatar={selections.avatar}
+                        selectedEnvironment={selections.environment}
+                    />
                 </Canvas>
             </ClassroomUI>
         </>

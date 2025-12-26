@@ -3,10 +3,11 @@ import { Link } from "react-router-dom";
 import { useChat } from "../hooks/useChat";
 import { VoiceRecognition } from "./VoiceRecognition";
 import { PerformanceMetrics } from "./PerformanceMetrics";
+import { ChatHistory } from "./ChatHistory";
 
 export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
     const input = useRef();
-    const { chat, loading, cameraZoomed, setCameraZoomed, message, setLanguage, voiceGender, setVoiceGender, stopSpeaking, setSttTime, showGreeting } = useChat();
+    const { chat, loading, cameraZoomed, setCameraZoomed, message, setLanguage, voiceGender, setVoiceGender, stopSpeaking, setSttTime, showGreeting, chatHistory } = useChat();
 
     const [isVoiceActive, setIsVoiceActive] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
@@ -34,8 +35,8 @@ export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
         }
     }, [userLanguage, userInfo?.voiceGender, setLanguage, setVoiceGender]);
 
-    // Idle timeout: show greeting after inactivity (DISABLED)
-    // To enable, uncomment the code below
+    // Idle timeout: show greeting after 20 seconds of inactivity
+    // TEMPORARILY DISABLED - можно включить позже
     /*
     useEffect(() => {
         const checkIdleTimeout = setInterval(() => {
@@ -242,7 +243,10 @@ export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
             )}
 
             {/* Main Content Area - 3D Avatar and Metrics Panel */}
-            <div className="flex-1 flex relative">
+            <div className="flex-1 flex relative overflow-hidden">
+                {/* Chat History Panel - Left */}
+                <ChatHistory messages={chatHistory} userLanguage={userLanguage} />
+
                 {/* Avatar Area */}
                 <div className="flex-1 relative bg-black">
                     {props.children}

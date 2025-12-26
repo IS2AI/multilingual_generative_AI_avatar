@@ -125,6 +125,7 @@ export const ChatProvider = ({ children }) => {
   const [cameraZoomed, setCameraZoomed] = useState(false);
   const [performanceMetrics, setPerformanceMetrics] = useState(null);
   const [sttTime, setSttTime] = useState(0); // Store STT time
+  const [chatHistory, setChatHistory] = useState([]); // Store conversation history
 
   const chat = async (message, userLanguage = language, voiceSttTime = null) => {
     setLoading(true);
@@ -132,6 +133,14 @@ export const ChatProvider = ({ children }) => {
     console.log('Chat called with message:', message, 'language:', userLanguage);
     console.log('Voice STT time passed:', voiceSttTime);
     console.log('Current STT time state:', sttTime);
+
+    // Add user message to chat history
+    const userMessage = {
+      role: 'user',
+      text: message,
+      timestamp: new Date().toISOString()
+    };
+    setChatHistory(prev => [...prev, userMessage]);
 
     const startTime = performance.now();
     const currentSttTime = voiceSttTime !== null ? voiceSttTime : sttTime; // Use passed STT time or fallback to state
@@ -206,11 +215,19 @@ export const ChatProvider = ({ children }) => {
       console.log('Raw response text:', responseText);
       console.log('Raw response length:', responseText.length);
 
-      // EXTRACT REAL RESPONSE: Remove thinking section and get actual answer
+      // IMPROVED CLEANING: Extract only user-facing content (outside <think> tags)
+      console.log('🧹 Starting to clean thinking tags...');
 
-      // Strategy: If response has <think> tags, extract only content AFTER </think>
+      // 1. Remove all complete <think>...</think> blocks (with their content)
+      const beforeRemoval = responseText;
+      responseText = responseText.replace(/<think>[\s\S]*?<\/think>/gi, '');
+      if (beforeRemoval !== responseText) {
+        console.log('✂️ Removed complete <think>...</think> blocks');
+      }
+
+      // 2. Handle orphaned closing </think> tag - remove everything BEFORE it
       if (responseText.includes('</think>')) {
-        console.log('✂️ Found </think> tag - extracting content after thinking section');
+        console.log('⚠️ Found orphaned </think> tag - keeping only content after it');
         const parts = responseText.split('</think>');
         responseText = parts[parts.length - 1]; // Get everything after last </think>
         console.log('Content after </think>:', responseText);
@@ -220,13 +237,22 @@ export const ChatProvider = ({ children }) => {
         responseText = responseText.split('<think>')[0];
       }
 
-      // Remove any remaining <think> or </think> tags
+      // 3. Handle orphaned opening <think> tag - remove everything FROM it onwards
+      if (responseText.includes('<think>')) {
+        console.log('⚠️ Found orphaned <think> tag - removing everything after it');
+        responseText = responseText.split('<think>')[0]; // Keep only what's BEFORE <think>
+      }
+
+      // 4. Remove any remaining stray tags
       responseText = responseText.replace(/<\/?think[^>]*>/gi, '');
       responseText = responseText.replace(/\[?\/?думаю\]?/gi, '');
 
-      // Remove common thinking patterns at the start
-      responseText = responseText.replace(/^(Okay|Alright|Let me|I need to|First|So|Well),?\s+(think|answer|respond|address|tackle|consider)[\s\S]*?(\n\n|\.\s+[A-ZА-ЯӘ])/i, '$3');
-      responseText = responseText.replace(/^.*?(Let me think|I should|I need to).*?\n/gim, '');
+      // 3. Remove common thinking patterns (English) - more aggressive
+      // Remove entire thinking paragraphs that start with thinking indicators
+      responseText = responseText.replace(/^(Okay|Alright|Let me|I need to|First|So|Well|The user wrote|It translates to|I should),?\s+[\s\S]*?(\n\n[А-ЯӘҒҚҢӨҰҮҺІа-яәғқңөұүһі]|\n\n[A-Z][a-z]|$)/gi, '$2');
+      responseText = responseText.replace(/^.*?(Let me think|I should|I need to|The user|It translates).*?\n/gim, '');
+      // Remove paragraphs explaining what the user said
+      responseText = responseText.replace(/^.*?which is in (Kazakh|Russian|English).*?\n/gim, '');
 
       // Remove thinking indicators
       responseText = responseText.replace(/^(Thinking:|Analysis:|Plan:|Step \d+:).*$/gim, '');
@@ -235,15 +261,78 @@ export const ChatProvider = ({ children }) => {
       responseText = responseText.replace(/^(continuation|answer|response|reply|result)\.?\s*/i, '');
       responseText = responseText.replace(/^(Continuation|Answer|Response|Reply|Result):\s*/gim, '');
 
-      // Clean up whitespace
+      // 5.5. Remove language markers at the start (e.g., "қазақша", "english", "русский")
+      responseText = responseText.replace(/^(қазақша|english|русский|kazakh|russian)\s*\n*/gi, '');
+
+      // 6. Clean up multiple newlines and extra spaces
       responseText = responseText.replace(/\n\s*\n\s*\n+/g, '\n\n');
       responseText = responseText.trim();
+
+      // 7. Remove incomplete final sentence if no sentence-ending punctuation at end
+      // If we already have Cyrillic content, avoid over-trimming; otherwise trim incomplete short endings
+      const hasCyrillic = /[А-Яа-яӘәҒғҚқҢңӨөҰұҮүҺһІі]/.test(responseText);
+      if (!hasCyrillic && !responseText.match(/[.!?]$/) && responseText.length <= 200) {
+        console.log('⚠️ Response has incomplete final sentence, removing it (short text, non-Cyrillic)');
+        // Find last sentence-ending punctuation
+        const lastPeriod = responseText.lastIndexOf('.');
+        const lastExclamation = responseText.lastIndexOf('!');
+        const lastQuestion = responseText.lastIndexOf('?');
+        const lastSentenceEnd = Math.max(lastPeriod, lastExclamation, lastQuestion);
+
+        if (lastSentenceEnd > 0) {
+          // Cut off everything after the last complete sentence
+          responseText = responseText.substring(0, lastSentenceEnd + 1).trim();
+          console.log('✂️ Removed incomplete sentence, ending at position', lastSentenceEnd);
+        }
+      }
+
+      // Prefer only the user-facing sentences in target script (avoid English reasoning leakage)
+      const sentences = responseText.split(/(?<=[.!?])\s+/).filter(Boolean);
+      console.log('📝 Total sentences found:', sentences.length);
+      console.log('📝 Sentences:', sentences);
+
+      // For Kazakh/Russian, filter for sentences that are PRIMARILY Cyrillic (>50% of letters are Cyrillic)
+      if (userLanguage === 'kk' || userLanguage === 'ru') {
+        const cyrillicSentences = sentences.filter(s => {
+          const cyrillicLetters = (s.match(/[А-Яа-яӘәҒғҚқҢңӨөҰұҮүҺһІі]/g) || []).length;
+          const latinLetters = (s.match(/[A-Za-z]/g) || []).length;
+          console.log(`  - Sentence: "${s.substring(0, 50)}..." | Cyrillic: ${cyrillicLetters}, Latin: ${latinLetters}`);
+          return cyrillicLetters > latinLetters; // More Cyrillic than Latin
+        });
+
+        console.log('✅ Cyrillic sentences after filter:', cyrillicSentences.length);
+
+        if (cyrillicSentences.length > 0) {
+          responseText = cyrillicSentences.join(' ').trim();
+          console.log('✂️ Using Cyrillic sentences only to avoid English reasoning');
+
+          // Check if response contains Chinese characters - model sometimes responds in Chinese
+          const hasChinese = /[\u4e00-\u9fa5]/.test(responseText);
+          if (hasChinese) {
+            console.warn('⚠️ Model responded in Chinese instead of Kazakh/Russian! Using fallback.');
+            responseText = userLanguage === 'kk'
+              ? 'Кешіріңіз, мен сұрағыңызды түсінбедім. Басқаша қойып көріңіз.'
+              : userLanguage === 'ru'
+              ? 'Извините, я не понял ваш вопрос. Попробуйте переформулировать.'
+              : 'Sorry, I did not understand your question. Please try rephrasing.';
+          }
+        } else {
+          // No valid Cyrillic sentences found - use greeting fallback
+          console.warn('⚠️ No valid Cyrillic sentences found, using greeting fallback');
+          console.warn('⚠️ This means model generated only English thinking or empty response');
+          responseText = userLanguage === 'kk'
+            ? 'Кешіріңіз, мен сұрағыңызды түсінбедім. Басқаша қойып көріңіз.'
+            : userLanguage === 'ru'
+            ? 'Извините, я не понял ваш вопрос. Попробуйте переформулировать.'
+            : 'Sorry, I did not understand your question. Please try rephrasing.';
+        }
+      }
 
       console.log('Cleaned response text:', responseText);
       console.log('Cleaned response length:', responseText.length);
 
       // Detect language of response
-      const detectedLang = detectLanguage(responseText) || userLanguage;
+      let detectedLang = detectLanguage(responseText) || userLanguage;
       console.log('Detected language:', detectedLang);
       console.log('Expected language:', userLanguage);
 
@@ -251,10 +340,17 @@ export const ChatProvider = ({ children }) => {
       const thinkingIndicators = /\b(then|first|next|after|but wait|maybe|should i|perhaps|also|finally|wait|oh)\b.*\b(the|a|an|to|for|with|from)\b/i;
       const isStillThinking = detectedLang === 'en' && userLanguage !== 'en' && thinkingIndicators.test(responseText);
 
-      // If response is empty, too short, or still thinking content, provide fallback
-      if (!responseText || responseText.length < 3 || isStillThinking) {
+      // If response is empty, too short, wrong language, or still thinking content, provide fallback
+      const looksTruncated = responseText.trim().startsWith('*') || responseText.trim().length < 15;
+      const languageMismatch = detectedLang !== userLanguage && userLanguage !== 'en';
+
+      if (!responseText || responseText.length < 5 || isStillThinking || looksTruncated || languageMismatch) {
         if (isStillThinking) {
           console.warn('⚠️ Response is still thinking content in English! Using fallback.');
+        } else if (looksTruncated) {
+          console.warn('⚠️ Response too short or truncated after cleaning, using fallback');
+        } else if (languageMismatch) {
+          console.warn('⚠️ Language mismatch, using friendly or math fallback');
         } else {
           console.warn('⚠️ Response empty after cleaning thinking section! Using fallback.');
           console.warn('This happens when LLM only outputs thinking without real answer.');
@@ -279,14 +375,29 @@ export const ChatProvider = ({ children }) => {
 
         // Take first maxWords words
         const truncatedWords = words.slice(0, maxWords);
-        responseText = truncatedWords.join(' ');
+        let truncatedText = truncatedWords.join(' ');
 
-        // Add ellipsis if we truncated mid-sentence
-        if (!responseText.match(/[.!?]$/)) {
-          responseText += '...';
+        // Find last sentence-ending punctuation (. ! ?)
+        const lastPeriod = truncatedText.lastIndexOf('.');
+        const lastExclamation = truncatedText.lastIndexOf('!');
+        const lastQuestion = truncatedText.lastIndexOf('?');
+        const lastSentenceEnd = Math.max(lastPeriod, lastExclamation, lastQuestion);
+
+        // If found a sentence end, cut there to keep complete sentences
+        if (lastSentenceEnd > 0 && lastSentenceEnd > truncatedText.length * 0.5) {
+          // Only cut at sentence if it's past 50% of truncated text (avoid cutting too early)
+          responseText = truncatedText.substring(0, lastSentenceEnd + 1);
+          console.log(`✂️ Truncated at sentence boundary (position ${lastSentenceEnd})`);
+        } else {
+          // No good sentence break found, keep all maxWords and add ellipsis
+          responseText = truncatedText;
+          if (!responseText.match(/[.!?]$/)) {
+            responseText += '...';
+          }
+          console.log(`✂️ No sentence boundary found, added ellipsis`);
         }
 
-        console.log(`✂️ Truncated response (${truncatedWords.length} words):`, responseText.substring(0, 100) + '...');
+        console.log(`✂️ Truncated response:`, responseText.substring(0, 100) + '...');
       } else {
         console.log(`✅ Response length OK (${words.length} words)`);
       }
@@ -369,34 +480,48 @@ export const ChatProvider = ({ children }) => {
 
       // Calculate estimated speech duration based on audio
       const wordCount = responseText.split(/\s+/).length;
-      const estimatedDuration = (wordCount / 150) * 60; // in seconds
+      const estimatedDuration = (wordCount / 150) * 60; // ~150 words per minute
       metrics.audioDuration = estimatedDuration.toFixed(2);
 
-      // Generate lipsync
+      console.log('Estimated audio duration:', metrics.audioDuration, 's');
+
+      // Generate lipsync data
       const lipsync = generateLipsync(responseText, estimatedDuration);
 
-      // Calculate total time (STT + Oylan + TTS)
-      const endTime = performance.now();
-      const calculatedTotal = parseFloat(metrics.sttTime) + parseFloat(metrics.oylanTime) + parseFloat(metrics.mangiSozTime);
-      metrics.totalTime = calculatedTotal.toFixed(2);
-
-      // Set metrics and reset STT time AFTER setting metrics
-      setPerformanceMetrics(metrics);
-      console.log('Performance metrics:', metrics);
-      setSttTime(0); // Reset STT time for next request
-
-      // Prepare response message with audio
-      const responseMessage = {
+      // Add AI response to chat history
+      const aiMessage = {
+        role: 'assistant',
         text: responseText,
-        audio: audioBase64, // Base64 audio from MangiSoz
-        lipsync: lipsync,
+        timestamp: new Date().toISOString()
+      };
+      setChatHistory(prev => [...prev, aiMessage]);
+
+      // Calculate total time
+      const endTime = performance.now();
+      metrics.totalTime = ((endTime - startTime) / 1000).toFixed(2);
+
+      console.log('=== PERFORMANCE METRICS ===');
+      console.log('Total Time:', metrics.totalTime, 's');
+      console.log('STT Time:', metrics.sttTime, 's');
+      console.log('Oylan LLM Time:', metrics.oylanTime, 's');
+      console.log('MangiSoz TTS Time:', metrics.mangiSozTime, 's');
+      console.log('Audio Duration:', metrics.audioDuration, 's');
+
+      setPerformanceMetrics(metrics);
+
+      // Create message with audio
+      const messageWithAudio = {
+        text: responseText,
+        audioUrl: audioUrl, // Use blob URL instead of base64
+        useTTS: true,
         animation: "Talking_1",
-        facialExpression: "default",
-        estimatedDuration: estimatedDuration
+        facialExpression: "smile",
+        lipsync: lipsync
       };
 
-      console.log('Setting response message with audio');
-      setMessages((messages) => [...messages, responseMessage]);
+      console.log('Setting message with audio');
+      setMessages((messages) => [...messages, messageWithAudio]);
+      setLoading(false);
 
     } catch (err) {
       console.error('Chat error:', err);
@@ -466,21 +591,9 @@ export const ChatProvider = ({ children }) => {
         throw new Error('TTS failed for greeting');
       }
 
-      // Convert blob to base64
+      // Create blob URL for direct playback
       const audioBlob = await ttsResponse.blob();
-      const audioBase64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64 = reader.result.split(',')[1];
-          resolve(base64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(audioBlob);
-      });
-
-      if (!audioBase64) {
-        throw new Error('No audio in greeting TTS');
-      }
+      const audioUrl = URL.createObjectURL(audioBlob);
 
       // Estimate duration
       const wordCount = greetingText.split(/\s+/).length;
@@ -492,7 +605,7 @@ export const ChatProvider = ({ children }) => {
       // Show greeting message
       const greetingMessage = {
         text: greetingText,
-        audio: audioBase64,
+        audioUrl: audioUrl, // Use blob URL instead of base64
         lipsync: lipsync,
         animation: "Talking_1",
         facialExpression: "smile",
@@ -532,6 +645,7 @@ export const ChatProvider = ({ children }) => {
         setVoiceGender,
         performanceMetrics,
         setSttTime,
+        chatHistory,
       }}
     >
       {children}

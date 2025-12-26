@@ -89,7 +89,6 @@ export const useMangiSozSTT = (language = 'kk') => {
             const data = await response.json();
             console.log('Local ASR response:', data);
             console.log('Response keys:', Object.keys(data));
-            console.log('Full response:', JSON.stringify(data, null, 2));
 
             // OpenAI Whisper API format returns { text: "transcribed text" }
             // Also try other possible formats
@@ -97,13 +96,13 @@ export const useMangiSozSTT = (language = 'kk') => {
             console.log('Transcribed text:', transcribedText);
 
             if (!transcribedText) {
-                console.error('Could not find transcribed text in response. Response data:', data);
+                console.error('❌ Could not find transcribed text in response. Full response:', JSON.stringify(data, null, 2));
             }
 
             return { text: transcribedText.trim(), sttTime: sttTimeSeconds };
 
         } catch (error) {
-            console.error('Transcription error:', error);
+            console.error('❌ Transcription error:', error);
             throw error;
         } finally {
             setIsProcessing(false);

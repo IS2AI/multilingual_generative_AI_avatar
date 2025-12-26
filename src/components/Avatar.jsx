@@ -123,64 +123,13 @@ export function Avatar({ modelPath = "/models/64f1a714fe61576b46f27ca2.glb", ...
     setFacialExpression(message.facialExpression);
     setLipsync(message.lipsync);
 
-    // Handle audio from TTS
-    if (message.audio) {
-      console.log('Avatar: Playing audio from TTS');
-      console.log('Audio data length:', message.audio.length);
-      console.log('Audio preview:', message.audio.substring(0, 50) + '...');
+    // Handle audio from MangiSoz TTS
+    if (message.audioUrl) {
+      console.log('Avatar: Playing audio from MangiSoz');
+      console.log('Audio URL:', message.audioUrl);
 
       try {
-        let bytes;
-
-        // Detect format: base64 or HEX
-        // Base64 uses A-Z, a-z, 0-9, +, /, =
-        // HEX uses only 0-9, a-f, A-F
-        const isHex = /^[0-9a-fA-F]+$/.test(message.audio);
-        const isBase64 = /^[A-Za-z0-9+/]+=*$/.test(message.audio);
-
-        if (isBase64 && !isHex) {
-          // Base64 format (from new TTS API)
-          console.log('Detected base64 format');
-          const binaryString = atob(message.audio);
-          bytes = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-        } else {
-          // HEX format (from old MangiSoz API)
-          console.log('Detected HEX format');
-          const hexString = message.audio;
-          bytes = new Uint8Array(hexString.length / 2);
-          for (let i = 0; i < hexString.length; i += 2) {
-            bytes[i / 2] = parseInt(hexString.substr(i, 2), 16);
-          }
-        }
-
-        console.log('Converted to bytes, length:', bytes.length);
-
-        // Check audio header to determine format
-        const header = String.fromCharCode(...bytes.slice(0, 4));
-        console.log('Audio header:', header);
-
-        // Auto-detect MIME type based on header
-        let mimeType = 'audio/wav';
-        if (header === 'RIFF') {
-          mimeType = 'audio/wav';
-        } else if (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0) {
-          mimeType = 'audio/mpeg';
-        } else if (bytes[0] === 0x4F && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) {
-          mimeType = 'audio/ogg';
-        }
-
-        console.log('Using MIME type:', mimeType);
-
-        const blob = new Blob([bytes], { type: mimeType });
-        const audioUrl = URL.createObjectURL(blob);
-
-        console.log('Created blob URL:', audioUrl);
-        console.log('Blob size:', blob.size);
-
-        const audio = new Audio(audioUrl);
+        const audio = new Audio(message.audioUrl);
         let hasEnded = false;
 
       const handleEnd = () => {
@@ -327,7 +276,7 @@ export function Avatar({ modelPath = "/models/64f1a714fe61576b46f27ca2.glb", ...
     }
 
     const appliedMorphTargets = [];
-    if (message && lipsync) {
+    if (message && lipsync && audio) {
       const currentAudioTime = audio.currentTime;
       for (let i = 0; i < lipsync.mouthCues.length; i++) {
         const mouthCue = lipsync.mouthCues[i];

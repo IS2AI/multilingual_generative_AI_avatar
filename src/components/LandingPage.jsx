@@ -5,15 +5,27 @@ export const LandingPage = () => {
     const navigate = useNavigate();
     const [isVisible, setIsVisible] = useState(false);
     const [selectedLanguage, setSelectedLanguage] = useState('kk');
-    const [selectedAvatar, setSelectedAvatar] = useState('avatar1');
+    const [selectedAvatar, setSelectedAvatar] = useState('/models/64f1a714fe61576b46f27ca2.glb');
     const [selectedVoice, setSelectedVoice] = useState('female');
+    const [selectedEnvironment, setSelectedEnvironment] = useState('classroom-warm');
 
     useEffect(() => {
         setIsVisible(true);
     }, []);
 
     const avatars = [
-        { id: 'avatar1', name: 'Aigerim', image: '👩‍🏫', description: 'Professional Teacher' }
+        {
+            id: '/models/64f1a714fe61576b46f27ca2.glb',
+            name: 'Айгерім',
+            image: '👩‍🏫',
+            description: 'Professional Teacher'
+        },
+        {
+            id: '/models/64f1a714fe61576b46f27ca2.glb',
+            name: 'Мақсат',
+            image: '👨‍🏫',
+            description: 'Professional Teacher'
+        }
     ];
 
     const languages = [
@@ -22,12 +34,20 @@ export const LandingPage = () => {
         { code: 'en', name: 'English', flag: '🇬🇧' }
     ];
 
+    const environments = [
+        { id: 'classroom-warm', name: 'Warm Classroom', icon: '🖼️' },
+        { id: 'minimalistic_modern_office', name: 'Minimalistic Modern Office', icon: '🖥️' },
+        { id: 'small_office', name: 'Small Office', icon: '🧾' },
+        { id: 'forest', name: 'Forest', icon: '🌲' }
+    ];
+
     const handleStartLearning = () => {
         // Save selections to localStorage or pass via navigation state
         const selections = {
             language: selectedLanguage,
             avatar: selectedAvatar,
-            voiceGender: selectedVoice
+            voiceGender: selectedVoice,
+            environment: selectedEnvironment
         };
         navigate('/classroom', { state: selections });
     };
@@ -115,7 +135,7 @@ export const LandingPage = () => {
                             <h2 className="text-2xl font-bold mb-4 flex items-center">
                                 <span className="mr-2">👤</span> Select Your Avatar
                             </h2>
-                            <div className="flex justify-center">
+                            <div className="flex justify-center gap-6">
                                 {avatars.map((avatar) => (
                                     <button
                                         key={avatar.id}
@@ -129,6 +149,29 @@ export const LandingPage = () => {
                                         <div className="text-5xl mb-2">{avatar.image}</div>
                                         <div className="font-semibold text-sm">{avatar.name}</div>
                                         <div className="text-xs text-gray-400 mt-1">{avatar.description}</div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Environment Selection */}
+                        <div className="mb-8">
+                            <h2 className="text-2xl font-bold mb-4 flex items-center">
+                                <span className="mr-2">🌍</span> Select Environment
+                            </h2>
+                            <div className="grid grid-cols-2 gap-4">
+                                {environments.map((env) => (
+                                    <button
+                                        key={env.id}
+                                        onClick={() => setSelectedEnvironment(env.id)}
+                                        className={`p-6 rounded-xl border-2 transition-all duration-300 ${
+                                            selectedEnvironment === env.id
+                                                ? 'border-green-500 bg-green-500/20 scale-105'
+                                                : 'border-white/20 bg-white/5 hover:border-white/40'
+                                        }`}
+                                    >
+                                        <div className="text-4xl mb-2">{env.icon}</div>
+                                        <div className="font-semibold">{env.name}</div>
                                     </button>
                                 ))}
                             </div>
