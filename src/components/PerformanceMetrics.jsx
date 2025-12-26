@@ -15,22 +15,22 @@ export const PerformanceMetrics = () => {
 
   const metrics = [
     {
-      label: 'MangiSoz STT',
+      label: 'STT',
       value: `${performanceMetrics.sttTime || '0.00'}s`,
       color: 'text-purple-400',
-      description: 'Time to transcribe speech to text'
+      description: 'Time to transcribe speech to text (MangiSoz)'
     },
     {
-      label: 'Oylan API Response',
+      label: 'LLM Response',
       value: `${performanceMetrics.oylanTime}s`,
       color: 'text-blue-400',
       description: 'Time to get text response from LLM'
     },
     {
-      label: 'MangiSoz TTS',
+      label: 'TTS',
       value: `${performanceMetrics.mangiSozTime}s`,
       color: 'text-green-400',
-      description: 'Time to generate audio from text'
+      description: 'Time to generate audio from text (Local Matcha TTS)'
     },
     {
       label: 'Total Time',
@@ -77,7 +77,7 @@ export const PerformanceMetrics = () => {
           )}
 
           <div className="flex items-center gap-2">
-            <div className="text-xs text-gray-400 w-24">Oylan</div>
+            <div className="text-xs text-gray-400 w-24">LLM</div>
             <div className="flex-1 h-4 bg-gray-700 rounded overflow-hidden">
               <div
                 className="h-full bg-blue-500"

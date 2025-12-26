@@ -1,15 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { convertToWav } from '../utils/audioConverter';
 
-// MangiSoz STT API configuration
-const MANGISOZ_STT_API_URL = "/mangisoz-api/v1/transcript/transcript_audio/";
-const MANGISOZ_STT_API_KEY = "XUD5UQxZj5UtcZMglv7sjg";
+// STT API configuration
+// Old MangiSoz STT API (commented out)
+// const MANGISOZ_STT_API_URL = "/mangisoz-api/v1/transcript/transcript_audio/";
+// const MANGISOZ_STT_API_KEY = "XUD5UQxZj5UtcZMglv7sjg";
 
-// Language mapping for MangiSoz
+// New: Local Faster Whisper ASR API
+const ASR_API_URL = "/asr-api/v1/audio/transcriptions";
+const ASR_API_KEY = "test-key-1"; // Update if your API requires a different key
+const ASR_MODEL_ID = "issai/faster-whisper-mangisoz-best-10july2025-fp16";
+
+// Language mapping for ASR API (uses ISO 639-1 codes: kk, ru, en)
 const languageMap = {
-  'kk': 'kaz',
-  'ru': 'rus',
-  'en': 'eng'
+  'kk': 'kk',  // Kazakh
+  'ru': 'ru',  // Russian
+  'en': 'en'   // English
 };
 
 export const useMangiSozSTT = (language = 'kk') => {
@@ -41,26 +47,28 @@ export const useMangiSozSTT = (language = 'kk') => {
         return hasMediaDevices && hasMediaRecorder;
     }, []);
 
-    // Send audio file to MangiSoz STT API
+    // Send audio file to Local ASR API (Faster Whisper)
     const transcribeAudio = async (audioBlob) => {
         try {
             setIsProcessing(true);
-            console.log('Sending audio file to MangiSoz STT...');
+            console.log('Sending audio file to Local ASR API...');
             console.log('Audio blob size:', audioBlob.size, 'type:', audioBlob.type);
 
-            // Create FormData and append the audio file
+            // Create FormData with OpenAI Whisper API format
             const formData = new FormData();
             formData.append('file', audioBlob, 'audio.wav');
+            formData.append('model', ASR_MODEL_ID); // Your fine-tuned model
+            formData.append('language', languageMap[language] || language); // Send language hint (kk, ru, or en)
 
-            console.log('Sending request to MangiSoz STT API...');
+            console.log('Sending request to Local ASR API...');
 
             const sttStartTime = performance.now();
             const response = await fetch(
-                MANGISOZ_STT_API_URL,
+                ASR_API_URL,
                 {
                     method: "POST",
                     headers: {
-                        "Authorization": `Bearer ${MANGISOZ_STT_API_KEY}`
+                        "Authorization": `Bearer ${ASR_API_KEY}`
                         // Don't set Content-Type - browser will set it with boundary for FormData
                     },
                     body: formData
@@ -68,23 +76,24 @@ export const useMangiSozSTT = (language = 'kk') => {
             );
             const sttEndTime = performance.now();
             const sttTimeSeconds = ((sttEndTime - sttStartTime) / 1000).toFixed(2);
-            console.log('MangiSoz STT time:', sttTimeSeconds, 's');
+            console.log('Local ASR time:', sttTimeSeconds, 's');
 
-            console.log('MangiSoz STT response status:', response.status);
+            console.log('Local ASR response status:', response.status);
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('MangiSoz STT error response:', errorText);
-                throw new Error(`MangiSoz STT error: ${response.status} - ${errorText}`);
+                console.error('Local ASR error response:', errorText);
+                throw new Error(`Local ASR error: ${response.status} - ${errorText}`);
             }
 
             const data = await response.json();
-            console.log('MangiSoz STT response:', data);
+            console.log('Local ASR response:', data);
             console.log('Response keys:', Object.keys(data));
             console.log('Full response:', JSON.stringify(data, null, 2));
 
-            // Try different possible response formats
-            const transcribedText = data.transcription_text || data.text || data.transcript || data.transcription || data.result || '';
+            // OpenAI Whisper API format returns { text: "transcribed text" }
+            // Also try other possible formats
+            const transcribedText = data.text || data.transcription_text || data.transcript || data.transcription || data.result || '';
             console.log('Transcribed text:', transcribedText);
 
             if (!transcribedText) {

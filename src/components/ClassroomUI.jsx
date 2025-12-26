@@ -34,7 +34,9 @@ export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
         }
     }, [userLanguage, userInfo?.voiceGender, setLanguage, setVoiceGender]);
 
-    // Idle timeout: show greeting after 20 seconds of inactivity
+    // Idle timeout: show greeting after inactivity (DISABLED)
+    // To enable, uncomment the code below
+    /*
     useEffect(() => {
         const checkIdleTimeout = setInterval(() => {
             const now = Date.now();
@@ -53,6 +55,7 @@ export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
 
         return () => clearInterval(checkIdleTimeout);
     }, [lastInteractionTime, loading, message, showGreeting]);
+    */
 
     const sendMessage = (text = null, voiceSttTime = null) => {
         const messageText = text || input.current.value;

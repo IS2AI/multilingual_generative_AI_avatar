@@ -1,19 +1,80 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
-// Oylan API configuration
-const OYLAN_ASSISTANT_ID = "793"; // Your assistant ID
-const OYLAN_API_URL = `/api/v1/assistant/${OYLAN_ASSISTANT_ID}/interactions/`;
-const OYLAN_API_KEY = "4zQPa23y.SXlAsiDq6CVPk0rDBM2ZXLsH3ClG04rf";
+// LLM API configuration
+// Old OYLAN API (commented out)
+// const OYLAN_ASSISTANT_ID = "793";
+// const OYLAN_API_URL = `/api/v1/assistant/${OYLAN_ASSISTANT_ID}/interactions/`;
+// const OYLAN_API_KEY = "4zQPa23y.SXlAsiDq6CVPk0rDBM2ZXLsH3ClG04rf";
 
-// MangiSoz TTS API configuration
-const MANGISOZ_API_URL = "/mangisoz-api/v1/translate/text/";
-const MANGISOZ_API_KEY = "1lsF_GHGlMWM8AIrQjRVAA";
+// New: Local LMDeploy model (OpenAI-compatible)
+const LLM_API_URL = "/api/v1/chat/completions";
+const LLM_MODEL_NAME = "issai/Qolda-MPO"; // Your model name
 
-// Language mapping for MangiSoz
-const languageMap = {
-  'kk': 'kaz',
-  'ru': 'rus',
-  'en': 'eng'
+// System prompt for natural, concise responses
+const SYSTEM_PROMPT = {
+  kk: `Сіз адаммен сөйлесіп тұрғандай қысқа және табиғи жауап беретін көмекші боласыз. Ережелер:
+- Тек қысқа, тікелей жауап беріңіз
+- "Көмекші:", "Жауап:" сияқты белгілерді қолданбаңыз
+- Түсіндіру немесе контекст бермеңіз
+- Адам сияқты қарапайым әңгімелесіңіз
+
+Мысалдар:
+Қазақстанның астанасы қандай қала?
+Қазақстанның астанасы Астана.
+
+144-тің түбірі неше?
+144-тің түбірі 12.`,
+
+  ru: `Вы помощник, который отвечает кратко и естественно, как человек в разговоре. Правила:
+- Давайте только краткий, прямой ответ
+- Не используйте метки типа "Помощник:", "Ответ:"
+- Не давайте объяснений или контекста
+- Общайтесь просто, как человек
+
+Примеры:
+Какая столица Казахстана?
+Столица Казахстана — Астана.
+
+Каков корень из 144?
+Корень из 144 равен 12.`,
+
+  en: `You are an assistant who responds briefly and naturally, like a human in conversation. Rules:
+- Give only brief, direct answers
+- Don't use labels like "Assistant:", "Answer:"
+- Don't provide explanations or context
+- Speak simply, like a human
+
+Examples:
+What is the capital of Kazakhstan?
+Capital of Kazakhstan is Astana.
+
+What is the root of 144?
+Root of 144 is 12.`
+};
+
+// TTS API configuration
+// Old MangiSoz TTS API (commented out)
+// const MANGISOZ_API_URL = "/mangisoz-api/v1/translate/text/";
+// const MANGISOZ_API_KEY = "1lsF_GHGlMWM8AIrQjRVAA";
+
+// New: Local TTS API (Matcha-TTS with OpenAI-compatible endpoint)
+const TTS_API_URL = "/tts-api/tts/v1/audio/speech";
+const TTS_API_KEY = "test-key-1";
+const TTS_MODEL_NAME = "matcha-tts-v1";
+
+// Language mapping for TTS
+// Old MangiSoz language codes
+// const languageMap = {
+//   'kk': 'kaz',
+//   'ru': 'rus',
+//   'en': 'eng'
+// };
+
+// Language mapping for local TTS API
+const ttsLanguageMap = {
+  'kk': 'kk',  // Kazakh
+  'ru': 'ru',  // Russian
+  'en': 'en'   // English
 };
 
 const ChatContext = createContext();
@@ -86,87 +147,96 @@ export const ChatProvider = ({ children }) => {
     console.log('Metrics initialized with STT time:', metrics.sttTime);
 
     try {
-      // Call Oylan API using FormData (multipart/form-data)
-      console.log('Calling Oylan API...');
-      console.log('URL:', OYLAN_API_URL);
+      // Call Local LLM API using OpenAI-compatible format
+      console.log('Calling Local LLM API...');
+      console.log('URL:', LLM_API_URL);
 
-      const oylanStartTime = performance.now();
-      const formData = new FormData();
-      formData.append('content', message);
-      // Try different parameter names for token limit
-      formData.append('max_tokens', '300');
-      formData.append('max_length', '300');
-      formData.append('max_response_length', '300');
+      const llmStartTime = performance.now();
 
-      console.log('Sending to Oylan with token limit: 300');
+      const requestBody = {
+        model: LLM_MODEL_NAME,
+        messages: [
+          {
+            role: "system",
+            content: SYSTEM_PROMPT[userLanguage] || SYSTEM_PROMPT['en']
+          },
+          {
+            role: "user",
+            content: message
+          }
+        ],
+        // No max_tokens - get full response including thinking, then extract real answer
+        temperature: 0.7,
+        top_p: 0.95,
+        stop: ["\n\n\n", "User:", "Пайдаланушы:", "Пользователь:"],  // Stop sequences to prevent rambling
+        extra_body: {
+          top_k: 20,
+          enable_thinking: false  // Disable thinking mode for direct responses
+        }
+      };
 
-      const response = await fetch(OYLAN_API_URL, {
+      console.log('Sending to LLM with full response (no token limit), enable_thinking: false, and system prompt for language:', userLanguage);
+
+      const response = await fetch(LLM_API_URL, {
         method: "POST",
         headers: {
-          "Authorization": `Api-Key ${OYLAN_API_KEY}`
+          "Content-Type": "application/json"
         },
-        body: formData
+        body: JSON.stringify(requestBody)
       });
 
-      const oylanEndTime = performance.now();
-      metrics.oylanTime = ((oylanEndTime - oylanStartTime) / 1000).toFixed(2);
+      const llmEndTime = performance.now();
+      metrics.oylanTime = ((llmEndTime - llmStartTime) / 1000).toFixed(2);
 
-      console.log('Oylan API response status:', response.status);
-      console.log('Oylan API time:', metrics.oylanTime, 's');
+      console.log('LLM API response status:', response.status);
+      console.log('LLM API time:', metrics.oylanTime, 's');
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Oylan API error response:', errorText);
-        throw new Error(`Oylan API error! status: ${response.status}, details: ${errorText}`);
+        console.error('LLM API error response:', errorText);
+        throw new Error(`LLM API error! status: ${response.status}, details: ${errorText}`);
       }
 
       const data = await response.json();
-      console.log('Oylan API response:', data);
+      console.log('LLM API response:', data);
 
-      // Extract text from response
-      let responseText = data.response?.content || "No response";
+      // Extract text from OpenAI-compatible response format
+      let responseText = data.choices?.[0]?.message?.content || "No response";
 
       console.log('Raw response text:', responseText);
       console.log('Raw response length:', responseText.length);
 
-      // AGGRESSIVE CLEANING: Remove all thinking content
+      // EXTRACT REAL RESPONSE: Remove thinking section and get actual answer
 
-      // 1. Remove content between <think> tags (multiple patterns)
-      responseText = responseText.replace(/<think>[\s\S]*?<\/think>/gi, '');
-      responseText = responseText.replace(/<think[\s\S]*?<\/think>/gi, '');
-      responseText = responseText.replace(/\[думаю\][\s\S]*?\[\/думаю\]/gi, '');
-
-      // 2. Handle orphaned closing tags - remove everything BEFORE </think>
-      if (responseText.includes('</think>') && !responseText.includes('<think>')) {
-        console.log('⚠️ Found orphaned </think> tag - removing everything before it');
+      // Strategy: If response has <think> tags, extract only content AFTER </think>
+      if (responseText.includes('</think>')) {
+        console.log('✂️ Found </think> tag - extracting content after thinking section');
         const parts = responseText.split('</think>');
-        responseText = parts[parts.length - 1]; // Keep only what's after the last </think>
+        responseText = parts[parts.length - 1]; // Get everything after last </think>
+        console.log('Content after </think>:', responseText);
+      } else if (responseText.includes('<think>')) {
+        // If only opening tag exists (response cut off), remove everything from <think> onward
+        console.log('⚠️ Found only <think> tag - removing thinking section');
+        responseText = responseText.split('<think>')[0];
       }
 
-      // 3. Handle orphaned opening tags - remove everything AFTER <think>
-      if (responseText.includes('<think>') && !responseText.includes('</think>')) {
-        console.log('⚠️ Found orphaned <think> tag - removing everything after it');
-        responseText = responseText.split('<think>')[0]; // Keep only what's before <think>
-      }
-
-      // 4. Remove any remaining tags
+      // Remove any remaining <think> or </think> tags
       responseText = responseText.replace(/<\/?think[^>]*>/gi, '');
       responseText = responseText.replace(/\[?\/?думаю\]?/gi, '');
 
-      // 3. Remove common thinking patterns (English)
+      // Remove common thinking patterns at the start
       responseText = responseText.replace(/^(Okay|Alright|Let me|I need to|First|So|Well),?\s+(think|answer|respond|address|tackle|consider)[\s\S]*?(\n\n|\.\s+[A-ZА-ЯӘ])/i, '$3');
       responseText = responseText.replace(/^.*?(Let me think|I should|I need to).*?\n/gim, '');
 
-      // 4. Remove lines that start with thinking indicators
+      // Remove thinking indicators
       responseText = responseText.replace(/^(Thinking:|Analysis:|Plan:|Step \d+:).*$/gim, '');
 
-      // 5. Remove common AI artifacts at the start
+      // Remove AI artifacts at the start
       responseText = responseText.replace(/^(continuation|answer|response|reply|result)\.?\s*/i, '');
       responseText = responseText.replace(/^(Continuation|Answer|Response|Reply|Result):\s*/gim, '');
 
-      // 6. Clean up multiple newlines and extra spaces
+      // Clean up whitespace
       responseText = responseText.replace(/\n\s*\n\s*\n+/g, '\n\n');
-      responseText = responseText.replace(/^\s+|\s+$/g, ''); // trim
       responseText = responseText.trim();
 
       console.log('Cleaned response text:', responseText);
@@ -177,26 +247,27 @@ export const ChatProvider = ({ children }) => {
       console.log('Detected language:', detectedLang);
       console.log('Expected language:', userLanguage);
 
-      // Check if response is still thinking content (contains English thinking phrases)
+      // Check if response is empty or still thinking content
       const thinkingIndicators = /\b(then|first|next|after|but wait|maybe|should i|perhaps|also|finally|wait|oh)\b.*\b(the|a|an|to|for|with|from)\b/i;
       const isStillThinking = detectedLang === 'en' && userLanguage !== 'en' && thinkingIndicators.test(responseText);
 
       // If response is empty, too short, or still thinking content, provide fallback
-      if (!responseText || responseText.length < 5 || isStillThinking) {
+      if (!responseText || responseText.length < 3 || isStillThinking) {
         if (isStillThinking) {
           console.warn('⚠️ Response is still thinking content in English! Using fallback.');
         } else {
-          console.warn('Response too short after cleaning, using fallback');
+          console.warn('⚠️ Response empty after cleaning thinking section! Using fallback.');
+          console.warn('This happens when LLM only outputs thinking without real answer.');
         }
 
-        responseText = userLanguage === 'kk' ? 'Кешіріңіз, жауап беру мүмкін болмады. Сұрағыңызды қайталап көріңіз.' :
-                       userLanguage === 'ru' ? 'Извините, не смог ответить. Попробуйте переформулировать вопрос.' :
-                       'Sorry, could not respond. Please try rephrasing your question.';
+        responseText = userLanguage === 'kk' ? 'Мен сіздің көмекшіңізбін. Сізге қалай көмектесе аламын?' :
+                       userLanguage === 'ru' ? 'Я ваш помощник. Чем могу помочь?' :
+                       'I am your assistant. How can I help you?';
       }
 
-      // Truncate response to ~300 tokens (approximately 150 words for safety)
-      // This ensures the response is not too long for TTS and user reading
-      const maxWords = 150; // Reduced from 200 to ensure shorter responses
+      // Truncate response to ~100 tokens (approximately 50 words for concise responses)
+      // This ensures brief, natural responses suitable for voice interaction
+      const maxWords = 50; // Reduced to match max_tokens: 100 for very concise responses
       const words = responseText.split(/\s+/).filter(word => word.length > 0); // Remove empty strings
 
       console.log(`=== WORD COUNT CHECK ===`);
@@ -222,55 +293,78 @@ export const ChatProvider = ({ children }) => {
 
       console.log(`Final response word count: ${responseText.split(/\s+/).filter(w => w.length > 0).length}`);
 
-      // Call MangiSoz TTS API to generate audio
-      console.log('Calling MangiSoz TTS API...');
-      const mangiSozStartTime = performance.now();
-      const mangiSozLang = languageMap[detectedLang] || 'eng';
-      console.log('MangiSoz language:', mangiSozLang);
+      // Call Local TTS API to generate audio
+      console.log('Calling Local TTS API...');
+      const ttsStartTime = performance.now();
+      const ttsLang = ttsLanguageMap[detectedLang] || 'en';
+      console.log('TTS language:', ttsLang);
       console.log('Voice gender:', voiceGender);
       console.log('Text to convert:', responseText.substring(0, 100));
 
-      const ttsResponse = await fetch(
-        `${MANGISOZ_API_URL}?output_format=audio&output_voice=${voiceGender}`,
-        {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${MANGISOZ_API_KEY}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            source_language: mangiSozLang,
-            target_language: mangiSozLang,
-            text: responseText
-          })
-        }
-      );
+      const ttsResponse = await fetch(TTS_API_URL, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${TTS_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: TTS_MODEL_NAME,
+          input: responseText,
+          voice: voiceGender,  // "male" or "female"
+          lang: ttsLang,       // "kk", "ru", or "en"
+          format: "wav"
+        })
+      });
 
-      const mangiSozEndTime = performance.now();
-      metrics.mangiSozTime = ((mangiSozEndTime - mangiSozStartTime) / 1000).toFixed(2);
+      const ttsEndTime = performance.now();
+      metrics.mangiSozTime = ((ttsEndTime - ttsStartTime) / 1000).toFixed(2);
 
-      console.log('MangiSoz API response status:', ttsResponse.status);
-      console.log('MangiSoz API time:', metrics.mangiSozTime, 's');
+      console.log('TTS API response status:', ttsResponse.status);
+      console.log('TTS API time:', metrics.mangiSozTime, 's');
 
       if (!ttsResponse.ok) {
         const errorText = await ttsResponse.text();
-        console.error('MangiSoz API error response:', errorText);
-        throw new Error(`MangiSoz TTS error! status: ${ttsResponse.status}, details: ${errorText}`);
+        console.error('TTS API error response:', errorText);
+        console.error('TTS request body was:', {
+          model: TTS_MODEL_NAME,
+          input: responseText,
+          voice: voiceGender,
+          lang: ttsLang,
+          format: "wav"
+        });
+
+        let errorDetails;
+        try {
+          errorDetails = JSON.parse(errorText);
+        } catch {
+          errorDetails = errorText;
+        }
+
+        throw new Error(`TTS API error! status: ${ttsResponse.status}, details: ${JSON.stringify(errorDetails)}`);
       }
 
-      const ttsData = await ttsResponse.json();
-      console.log('MangiSoz TTS response received:', {
-        hasAudio: !!ttsData.audio,
-        audioLength: ttsData.audio ? ttsData.audio.length : 0,
-        audioPreview: ttsData.audio ? ttsData.audio.substring(0, 50) + '...' : 'null'
+      // TTS API returns audio blob directly, need to convert to base64
+      const audioBlob = await ttsResponse.blob();
+      console.log('TTS audio blob received:', {
+        size: audioBlob.size,
+        type: audioBlob.type
       });
 
-      // Extract audio from response
-      const audioBase64 = ttsData.audio;
+      // Convert blob to base64
+      const audioBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          // Remove data URL prefix (e.g., "data:audio/wav;base64,")
+          const base64 = reader.result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(audioBlob);
+      });
 
       if (!audioBase64) {
-        console.error('No audio in MangiSoz response!', ttsData);
-        throw new Error('MangiSoz did not return audio data');
+        console.error('Failed to convert audio to base64!');
+        throw new Error('TTS did not return valid audio data');
       }
 
       // Calculate estimated speech duration based on audio
@@ -350,28 +444,39 @@ export const ChatProvider = ({ children }) => {
     console.log('Showing greeting:', greetingText, 'in language:', greetingLanguage);
 
     try {
-      // Call MangiSoz TTS for the greeting
-      const mangiSozLang = languageMap[greetingLanguage] || 'kaz';
+      // Call Local TTS API for the greeting
+      const ttsLang = ttsLanguageMap[greetingLanguage] || 'en';
 
-      const ttsFormData = new FormData();
-      ttsFormData.append('text', greetingText);
-      ttsFormData.append('target_language', mangiSozLang);
-      ttsFormData.append('voice_gender', voiceGender);
-
-      const ttsResponse = await fetch(MANGISOZ_API_URL, {
+      const ttsResponse = await fetch(TTS_API_URL, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${MANGISOZ_API_KEY}`,
+          "Authorization": `Bearer ${TTS_API_KEY}`,
+          "Content-Type": "application/json"
         },
-        body: ttsFormData
+        body: JSON.stringify({
+          model: TTS_MODEL_NAME,
+          input: greetingText,
+          voice: voiceGender,
+          lang: ttsLang,
+          format: "wav"
+        })
       });
 
       if (!ttsResponse.ok) {
         throw new Error('TTS failed for greeting');
       }
 
-      const ttsData = await ttsResponse.json();
-      const audioBase64 = ttsData.audio;
+      // Convert blob to base64
+      const audioBlob = await ttsResponse.blob();
+      const audioBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = reader.result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(audioBlob);
+      });
 
       if (!audioBase64) {
         throw new Error('No audio in greeting TTS');
