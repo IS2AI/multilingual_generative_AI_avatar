@@ -35,29 +35,6 @@ export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
         }
     }, [userLanguage, userInfo?.voiceGender, setLanguage, setVoiceGender]);
 
-    // Idle timeout: show greeting after 20 seconds of inactivity
-    // TEMPORARILY DISABLED - можно включить позже
-    /*
-    useEffect(() => {
-        const checkIdleTimeout = setInterval(() => {
-            const now = Date.now();
-            const timeSinceLastInteraction = now - lastInteractionTime;
-            const IDLE_TIMEOUT = 20000; // 20 seconds
-
-            if (timeSinceLastInteraction >= IDLE_TIMEOUT && !loading && !message) {
-                // Pick a random greeting
-                const randomGreeting = kazakhGreetings[Math.floor(Math.random() * kazakhGreetings.length)];
-                console.log('Idle timeout reached, showing greeting:', randomGreeting);
-                showGreeting(randomGreeting, 'kk');
-                // Reset interaction time to prevent continuous greetings
-                setLastInteractionTime(Date.now());
-            }
-        }, 5000); // Check every 5 seconds
-
-        return () => clearInterval(checkIdleTimeout);
-    }, [lastInteractionTime, loading, message, showGreeting]);
-    */
-
     const sendMessage = (text = null, voiceSttTime = null) => {
         const messageText = text || input.current.value;
         if (!loading && !message && messageText.trim()) {
@@ -151,7 +128,7 @@ export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
     const translations = {
         kk: {
             talkingWith: 'Айгеріммен сөйлесу',
-            connectedTo: 'Oylan-ға қосулы',
+            connectedTo: 'Qolda-ға қосулы',
             placeholder: 'Жазбаңызды теріңіз...',
             send: 'Жіберу',
             thinking: 'Ойланып жатыр...',
@@ -159,7 +136,7 @@ export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
         },
         ru: {
             talkingWith: 'Разговор с Айгерим',
-            connectedTo: 'Подключено к Oylan',
+            connectedTo: 'Подключено к Qolda',
             placeholder: 'Введите сообщение...',
             send: 'Отправить',
             thinking: 'Думаю...',
@@ -167,7 +144,7 @@ export const ClassroomUI = ({ hidden, userInfo, ...props }) => {
         },
         en: {
             talkingWith: 'Talking with Aigerim',
-            connectedTo: 'Connected to Oylan',
+            connectedTo: 'Connected to Qolda',
             placeholder: 'Type your message...',
             send: 'Send',
             thinking: 'Thinking...',

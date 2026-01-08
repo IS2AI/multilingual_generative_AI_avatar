@@ -572,7 +572,7 @@
     utility-types "^3.10.0"
     zustand "^3.5.13"
 
-"@react-three/fiber@>=6.0", "@react-three/fiber@>=8.0", "@react-three/fiber@>=8.0.0", "@react-three/fiber@8.13.3":
+"@react-three/fiber@>=6.0", "@react-three/fiber@>=8.0", "@react-three/fiber@8.13.3":
   version "8.13.3"
   resolved "https://registry.npmjs.org/@react-three/fiber/-/fiber-8.13.3.tgz"
   integrity sha512-mCdTUB8D1kwlsOSxGhUg5nuGHt3HN3aNFc0s9I/N7ayk+nzT2ttLdn49c56nrHu+YK+SU1xnrxe6LqftZgIRmQ==
@@ -584,15 +584,6 @@
     react-use-measure "^2.1.1"
     scheduler "^0.21.0"
     suspend-react "^0.1.3"
-    zustand "^3.7.1"
-
-"@react-three/xr@^5.7.1":
-  version "5.7.1"
-  resolved "https://registry.npmjs.org/@react-three/xr/-/xr-5.7.1.tgz"
-  integrity sha512-GaRUSA+lE8VJF/NrXq7QQByZ4UGHbQQ4rs3QCphZs9fVidK86hGrMOQ0kL79gZc5pa3V5uFGlOhNcUdsTYE3Bg==
-  dependencies:
-    "@types/webxr" "*"
-    three-stdlib "^2.21.1"
     zustand "^3.7.1"
 
 "@stitches/react@^1.2.8":
@@ -1723,7 +1714,7 @@ three-mesh-bvh@^0.6.0:
   resolved "https://registry.npmjs.org/three-mesh-bvh/-/three-mesh-bvh-0.6.8.tgz"
   integrity sha512-EGebF9DZx1S8+7OZYNNTT80GXJZVf+UYXD/HyTg/e2kR/ApofIFfUS4ZzIHNnUVIadpnLSzM4n96wX+l7GMbnQ==
 
-three-stdlib@^2.21.1, three-stdlib@^2.23.9:
+three-stdlib@^2.23.9:
   version "2.27.1"
   resolved "https://registry.npmjs.org/three-stdlib/-/three-stdlib-2.27.1.tgz"
   integrity sha512-KmYNLaWhTfGX+GhALE2jPLb73gL5o8a5p2sGsabRshUE00L8JvTwECMg/6e1InuDOYLGinxmrCR2DdRKlzlBXg==
@@ -1735,7 +1726,7 @@ three-stdlib@^2.21.1, three-stdlib@^2.23.9:
     fflate "^0.6.9"
     potpack "^1.0.1"
 
-"three@>= 0.151.0", three@>=0.125.0, three@>=0.126, three@>=0.126.1, three@>=0.128.0, three@>=0.133, three@>=0.137, three@>=0.141, three@>=0.144.0, three@0.153.0:
+"three@>= 0.151.0", three@>=0.125.0, three@>=0.126, three@>=0.126.1, three@>=0.128.0, three@>=0.133, three@>=0.137, three@>=0.144.0, three@0.153.0:
   version "0.153.0"
   resolved "https://registry.npmjs.org/three/-/three-0.153.0.tgz"
   integrity sha512-OCP2/uQR6GcDpSLnJt/3a4mdS0kNWcbfUXIwLoEMgLzEUIVIYsSDwskpmOii/AkDM+BBwrl6+CKgrjX9+E2aWg==

@@ -97,7 +97,7 @@ export const LandingPage = () => {
 
                         <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 max-w-3xl mx-auto">
                             <p className="text-lg text-gray-200 leading-relaxed">
-                                This is a demonstration of an AI-powered avatar connected to the <span className="font-semibold text-blue-300">Oylan API</span>,
+                                This is a demonstration of an AI-powered avatar connected to the <span className="font-semibold text-blue-300">Qolda API</span>,
                                 developed by <span className="font-semibold text-purple-300">ISSAI</span> at Nazarbayev University.
                                 Interact with intelligent avatars in multiple languages using advanced language models.
                             </p>
@@ -216,7 +216,7 @@ export const LandingPage = () => {
                                 <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-xl blur opacity-0 group-hover:opacity-30 transition-opacity duration-300"></div>
                             </button>
                             <p className="text-sm text-gray-400 mt-4">
-                                Powered by Oylan LLM • ISSAI Research
+                                Powered by ISSAI
                             </p>
                         </div>
                     </div>

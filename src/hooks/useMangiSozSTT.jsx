@@ -2,11 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { convertToWav } from '../utils/audioConverter';
 
 // STT API configuration
-// Old MangiSoz STT API (commented out)
-// const MANGISOZ_STT_API_URL = "/mangisoz-api/v1/transcript/transcript_audio/";
-// const MANGISOZ_STT_API_KEY = "XUD5UQxZj5UtcZMglv7sjg";
-
-// New: Local Faster Whisper ASR API
 const ASR_API_URL = "/asr-api/v1/audio/transcriptions";
 const ASR_API_KEY = "test-key-1"; // Update if your API requires a different key
 const ASR_MODEL_ID = "issai/faster-whisper-mangisoz-best-10july2025-fp16";

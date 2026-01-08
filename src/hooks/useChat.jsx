@@ -1,76 +1,23 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
 // LLM API configuration
-// Old OYLAN API (commented out)
-// const OYLAN_ASSISTANT_ID = "793";
-// const OYLAN_API_URL = `/api/v1/assistant/${OYLAN_ASSISTANT_ID}/interactions/`;
-// const OYLAN_API_KEY = "4zQPa23y.SXlAsiDq6CVPk0rDBM2ZXLsH3ClG04rf";
-
-// New: Local LMDeploy model (OpenAI-compatible)
 const LLM_API_URL = "/api/v1/chat/completions";
-const LLM_MODEL_NAME = "issai/Qolda-MPO"; // Your model name
+const LLM_MODEL_NAME = "issai/Qolda"; // llama.cpp model name
 
 // System prompt for natural, concise responses
-const SYSTEM_PROMPT = {
-  kk: `Сіз адаммен сөйлесіп тұрғандай қысқа және табиғи жауап беретін көмекші боласыз. Ережелер:
-- Тек қысқа, тікелей жауап беріңіз
-- "Көмекші:", "Жауап:" сияқты белгілерді қолданбаңыз
-- Түсіндіру немесе контекст бермеңіз
-- Адам сияқты қарапайым әңгімелесіңіз
+const SYSTEM_PROMPT = `You are an expert multilingual assistant.
+Supported languages: English, Russian, Kazakh.
+Always respond in the user's language.
+Always answer in one complete grammatical sentence.
+Be concise.
+Answer only what is asked.
+No explanations, introductions, filler, or meta text.`;
 
-Мысалдар:
-Қазақстанның астанасы қандай қала?
-Қазақстанның астанасы Астана.
-
-144-тің түбірі неше?
-144-тің түбірі 12.`,
-
-  ru: `Вы помощник, который отвечает кратко и естественно, как человек в разговоре. Правила:
-- Давайте только краткий, прямой ответ
-- Не используйте метки типа "Помощник:", "Ответ:"
-- Не давайте объяснений или контекста
-- Общайтесь просто, как человек
-
-Примеры:
-Какая столица Казахстана?
-Столица Казахстана — Астана.
-
-Каков корень из 144?
-Корень из 144 равен 12.`,
-
-  en: `You are an assistant who responds briefly and naturally, like a human in conversation. Rules:
-- Give only brief, direct answers
-- Don't use labels like "Assistant:", "Answer:"
-- Don't provide explanations or context
-- Speak simply, like a human
-
-Examples:
-What is the capital of Kazakhstan?
-Capital of Kazakhstan is Astana.
-
-What is the root of 144?
-Root of 144 is 12.`
-};
-
-// TTS API configuration
-// Old MangiSoz TTS API (commented out)
-// const MANGISOZ_API_URL = "/mangisoz-api/v1/translate/text/";
-// const MANGISOZ_API_KEY = "1lsF_GHGlMWM8AIrQjRVAA";
-
-// New: Local TTS API (Matcha-TTS with OpenAI-compatible endpoint)
+// TTS Backend configuration
 const TTS_API_URL = "/tts-api/tts/v1/audio/speech";
-const TTS_API_KEY = "test-key-1";
 const TTS_MODEL_NAME = "matcha-tts-v1";
 
 // Language mapping for TTS
-// Old MangiSoz language codes
-// const languageMap = {
-//   'kk': 'kaz',
-//   'ru': 'rus',
-//   'en': 'eng'
-// };
-
-// Language mapping for local TTS API
 const ttsLanguageMap = {
   'kk': 'kk',  // Kazakh
   'ru': 'ru',  // Russian
@@ -80,9 +27,18 @@ const ttsLanguageMap = {
 const ChatContext = createContext();
 
 // Language detection function
-const detectLanguage = (text) => {
+const detectLanguage = (text, userLanguage = 'en') => {
   // Check for Cyrillic characters (Kazakh/Russian)
   const hasCyrillic = /[\u0400-\u04FF]/.test(text);
+
+  // Check if text is mostly numbers/symbols (language-neutral)
+  const letterCount = (text.match(/[A-Za-zА-Яа-яӘәҒғҚқҢңӨөҰұҮүҺһІі]/g) || []).length;
+  const isLanguageNeutral = letterCount <= 3;
+
+  // If language-neutral (mostly numbers/symbols), return user's language
+  if (isLanguageNeutral) {
+    return userLanguage;
+  }
 
   if (!hasCyrillic) return 'en';
 
@@ -167,21 +123,16 @@ export const ChatProvider = ({ children }) => {
         messages: [
           {
             role: "system",
-            content: SYSTEM_PROMPT[userLanguage] || SYSTEM_PROMPT['en']
+            content: SYSTEM_PROMPT
           },
           {
             role: "user",
             content: message
           }
         ],
-        // No max_tokens - get full response including thinking, then extract real answer
+        max_tokens: 512,
         temperature: 0.7,
-        top_p: 0.95,
-        stop: ["\n\n\n", "User:", "Пайдаланушы:", "Пользователь:"],  // Stop sequences to prevent rambling
-        extra_body: {
-          top_k: 20,
-          enable_thinking: false  // Disable thinking mode for direct responses
-        }
+        stream: false  // Use non-streaming for simpler handling
       };
 
       console.log('Sending to LLM with full response (no token limit), enable_thinking: false, and system prompt for language:', userLanguage);
@@ -292,11 +243,23 @@ export const ChatProvider = ({ children }) => {
       console.log('📝 Sentences:', sentences);
 
       // For Kazakh/Russian, filter for sentences that are PRIMARILY Cyrillic (>50% of letters are Cyrillic)
+      // BUT allow language-neutral responses (numbers, short answers with no/few letters)
       if (userLanguage === 'kk' || userLanguage === 'ru') {
         const cyrillicSentences = sentences.filter(s => {
           const cyrillicLetters = (s.match(/[А-Яа-яӘәҒғҚқҢңӨөҰұҮүҺһІі]/g) || []).length;
           const latinLetters = (s.match(/[A-Za-z]/g) || []).length;
+          const totalLetters = cyrillicLetters + latinLetters;
+
           console.log(`  - Sentence: "${s.substring(0, 50)}..." | Cyrillic: ${cyrillicLetters}, Latin: ${latinLetters}`);
+
+          // Accept if:
+          // 1. More Cyrillic than Latin (normal case)
+          // 2. Very few letters total (likely numbers or short language-neutral answers like "20", "100%")
+          if (totalLetters <= 3) {
+            console.log(`    ✅ Accepted: Language-neutral (few letters: ${totalLetters})`);
+            return true;
+          }
+
           return cyrillicLetters > latinLetters; // More Cyrillic than Latin
         });
 
@@ -331,8 +294,8 @@ export const ChatProvider = ({ children }) => {
       console.log('Cleaned response text:', responseText);
       console.log('Cleaned response length:', responseText.length);
 
-      // Detect language of response
-      let detectedLang = detectLanguage(responseText) || userLanguage;
+      // Detect language of response (pass userLanguage for language-neutral responses)
+      let detectedLang = detectLanguage(responseText, userLanguage) || userLanguage;
       console.log('Detected language:', detectedLang);
       console.log('Expected language:', userLanguage);
 
@@ -340,15 +303,15 @@ export const ChatProvider = ({ children }) => {
       const thinkingIndicators = /\b(then|first|next|after|but wait|maybe|should i|perhaps|also|finally|wait|oh)\b.*\b(the|a|an|to|for|with|from)\b/i;
       const isStillThinking = detectedLang === 'en' && userLanguage !== 'en' && thinkingIndicators.test(responseText);
 
-      // If response is empty, too short, wrong language, or still thinking content, provide fallback
-      const looksTruncated = responseText.trim().startsWith('*') || responseText.trim().length < 15;
-      const languageMismatch = detectedLang !== userLanguage && userLanguage !== 'en';
+      // If response is empty, wrong language, or still thinking content, provide fallback
+      // Note: Removed length checks to allow short but valid answers
+      // Allow kk/ru mismatch since many Kazakh words use same Cyrillic as Russian
+      const isCyrillicMismatch = (detectedLang === 'kk' && userLanguage === 'ru') || (detectedLang === 'ru' && userLanguage === 'kk');
+      const languageMismatch = detectedLang !== userLanguage && userLanguage !== 'en' && !isCyrillicMismatch;
 
-      if (!responseText || responseText.length < 5 || isStillThinking || looksTruncated || languageMismatch) {
+      if (!responseText || isStillThinking || languageMismatch) {
         if (isStillThinking) {
           console.warn('⚠️ Response is still thinking content in English! Using fallback.');
-        } else if (looksTruncated) {
-          console.warn('⚠️ Response too short or truncated after cleaning, using fallback');
         } else if (languageMismatch) {
           console.warn('⚠️ Language mismatch, using friendly or math fallback');
         } else {
@@ -415,7 +378,6 @@ export const ChatProvider = ({ children }) => {
       const ttsResponse = await fetch(TTS_API_URL, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${TTS_API_KEY}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
@@ -432,6 +394,27 @@ export const ChatProvider = ({ children }) => {
 
       console.log('TTS API response status:', ttsResponse.status);
       console.log('TTS API time:', metrics.mangiSozTime, 's');
+
+      // Log detailed TTS metrics from ONNX backend
+      const ttsMetrics = {
+        textProcessing: ttsResponse.headers.get('X-TTS-Text-Processing-Time'),
+        onnxInference: ttsResponse.headers.get('X-TTS-ONNX-Inference-Time'),
+        ioTime: ttsResponse.headers.get('X-TTS-IO-Time'),
+        totalTime: ttsResponse.headers.get('X-TTS-Total-Time'),
+        audioDuration: ttsResponse.headers.get('X-TTS-Audio-Duration'),
+        rtf: ttsResponse.headers.get('X-TTS-RTF')
+      };
+
+      if (ttsMetrics.rtf) {
+        console.log('TTS ONNX Metrics:', {
+          'Text Processing': `${parseFloat(ttsMetrics.textProcessing).toFixed(4)}s`,
+          'ONNX Inference': `${parseFloat(ttsMetrics.onnxInference).toFixed(4)}s`,
+          'I/O': `${parseFloat(ttsMetrics.ioTime).toFixed(4)}s`,
+          'Total': `${parseFloat(ttsMetrics.totalTime).toFixed(4)}s`,
+          'Audio Duration': `${parseFloat(ttsMetrics.audioDuration).toFixed(2)}s`,
+          'RTF': parseFloat(ttsMetrics.rtf).toFixed(3)
+        });
+      }
 
       if (!ttsResponse.ok) {
         const errorText = await ttsResponse.text();
@@ -454,29 +437,16 @@ export const ChatProvider = ({ children }) => {
         throw new Error(`TTS API error! status: ${ttsResponse.status}, details: ${JSON.stringify(errorDetails)}`);
       }
 
-      // TTS API returns audio blob directly, need to convert to base64
+      // TTS API returns audio blob directly, create blob URL for playback
       const audioBlob = await ttsResponse.blob();
       console.log('TTS audio blob received:', {
         size: audioBlob.size,
         type: audioBlob.type
       });
 
-      // Convert blob to base64
-      const audioBase64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          // Remove data URL prefix (e.g., "data:audio/wav;base64,")
-          const base64 = reader.result.split(',')[1];
-          resolve(base64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(audioBlob);
-      });
-
-      if (!audioBase64) {
-        console.error('Failed to convert audio to base64!');
-        throw new Error('TTS did not return valid audio data');
-      }
+      // Create blob URL for audio playback
+      const audioUrl = URL.createObjectURL(audioBlob);
+      console.log('Audio blob URL created:', audioUrl);
 
       // Calculate estimated speech duration based on audio
       const wordCount = responseText.split(/\s+/).length;
@@ -496,14 +466,15 @@ export const ChatProvider = ({ children }) => {
       };
       setChatHistory(prev => [...prev, aiMessage]);
 
-      // Calculate total time
+      // Calculate total time (including STT time from voice recognition)
       const endTime = performance.now();
-      metrics.totalTime = ((endTime - startTime) / 1000).toFixed(2);
+      const chatProcessingTime = (endTime - startTime) / 1000; // LLM + TTS time
+      metrics.totalTime = (chatProcessingTime + parseFloat(metrics.sttTime)).toFixed(2);
 
       console.log('=== PERFORMANCE METRICS ===');
       console.log('Total Time:', metrics.totalTime, 's');
       console.log('STT Time:', metrics.sttTime, 's');
-      console.log('Oylan LLM Time:', metrics.oylanTime, 's');
+      console.log('LLM Time:', metrics.oylanTime, 's');
       console.log('MangiSoz TTS Time:', metrics.mangiSozTime, 's');
       console.log('Audio Duration:', metrics.audioDuration, 's');
 
@@ -575,7 +546,6 @@ export const ChatProvider = ({ children }) => {
       const ttsResponse = await fetch(TTS_API_URL, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${TTS_API_KEY}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
