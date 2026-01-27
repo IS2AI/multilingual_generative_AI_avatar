@@ -1,6 +1,6 @@
-# Multilingual Generative AI Avatar: Local and Cloud-based Real-Time Deployments
+# 🤖 Multilingual Generative AI Avatar: Local and Cloud-based Real-Time Deployments
 
-## About
+## 📖 About
 
 This repository presents a lightweight, multilingual avatar system for real-time Human-AI interaction in Kazakh, Russian, and English. We compare two deployment architectures developed at ISSAI:
 
@@ -15,7 +15,7 @@ This repository presents a lightweight, multilingual avatar system for real-time
 - On-device models enable responsive, offline multilingual interaction
 
 
-## Features
+## ✨ Features
 
 ### Core Capabilities
 - **Multilingual Support:** Kazakh, Russian, and English language processing
@@ -24,13 +24,13 @@ This repository presents a lightweight, multilingual avatar system for real-time
 - **3D Avatar Interface:** Ready Player Me-based avatar rendering at 60 FPS
 - **Speech Processing Pipeline:** End-to-end ASR, LLM inference, and TTS synthesis
 
-## Demo
+## 🎬 Demo
 
 [![Video Demo](https://img.youtube.com/vi/bvcy_vNbb20/0.jpg)](https://youtu.be/bvcy_vNbb20?si=IY1tF9T-9_nJyx-Y)
 
 Watch the [video demonstration](https://youtu.be/bvcy_vNbb20?si=IY1tF9T-9_nJyx-Y) to see the system in action.
 
-## System Pipeline
+## 🏗️ System Pipeline
 
 The following diagram illustrates the complete system architecture comparing cloud-based and local deployment approaches:
 
