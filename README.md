@@ -26,9 +26,7 @@ This repository presents a lightweight, multilingual avatar system for real-time
 
 ## 🎬 Demo
 
-[![Video Demo](https://img.youtube.com/vi/bvcy_vNbb20/0.jpg)](https://youtu.be/bvcy_vNbb20?si=IY1tF9T-9_nJyx-Y)
-
-Watch the [video demonstration](https://youtu.be/bvcy_vNbb20?si=IY1tF9T-9_nJyx-Y) to see the system in action.
+**[▶️ Watch the video demonstration](https://youtu.be/bvcy_vNbb20?si=IY1tF9T-9_nJyx-Y)** to see the system in action.
 
 ## 🏗️ System Pipeline
 
@@ -139,3 +137,17 @@ npm run preview
 # or
 yarn preview
 ```
+
+## 📄 License
+
+This project is licensed under the **Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0)**.
+
+You are free to:
+- **Share** — copy and redistribute the material in any medium or format
+- **Adapt** — remix, transform, and build upon the material
+
+Under the following terms:
+- **Attribution** — You must give appropriate credit to ISSAI
+- **NonCommercial** — You may not use the material for commercial purposes
+
+For more details, see the [CC BY-NC 4.0 License](https://creativecommons.org/licenses/by-nc/4.0/).
