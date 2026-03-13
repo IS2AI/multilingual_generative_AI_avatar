@@ -1,10 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { convertToWav } from '../utils/audioConverter';
-
-// STT API configuration
-const ASR_API_URL = "/asr-api/v1/audio/transcriptions";
-const ASR_API_KEY = "test-key-1"; // Update if your API requires a different key
-const ASR_MODEL_ID = "issai/faster-whisper-mangisoz-best-10july2025-fp16";
+import { useApiConfig } from '../contexts/ApiConfigContext';
 
 // Language mapping for ASR API (uses ISO 639-1 codes: kk, ru, en)
 const languageMap = {
@@ -14,6 +10,7 @@ const languageMap = {
 };
 
 export const useMangiSozSTT = (language = 'kk') => {
+    const { config } = useApiConfig();
     const [isListening, setIsListening] = useState(false);
     const [transcript, setTranscript] = useState('');
     const [isSupported, setIsSupported] = useState(true);
@@ -23,6 +20,11 @@ export const useMangiSozSTT = (language = 'kk') => {
     const [autoSendEnabled, setAutoSendEnabled] = useState(true);
     const [isPaused, setIsPaused] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+
+    // Extract API configuration
+    const ASR_API_URL = config.asr.url;
+    const ASR_API_KEY = config.asr.apiKey;
+    const ASR_MODEL_ID = config.asr.model;
 
     const mediaRecorderRef = useRef(null);
     const mediaStreamRef = useRef(null);

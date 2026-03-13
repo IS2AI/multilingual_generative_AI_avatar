@@ -1,8 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-
-// LLM API configuration
-const LLM_API_URL = "/api/v1/chat/completions";
-const LLM_MODEL_NAME = "issai/Qolda"; // llama.cpp model name
+import { useApiConfig } from "../contexts/ApiConfigContext";
 
 // System prompt for natural, concise responses
 const SYSTEM_PROMPT = `You are an expert multilingual assistant.
@@ -12,10 +9,6 @@ Always answer in one complete grammatical sentence.
 Be concise.
 Answer only what is asked.
 No explanations, introductions, filler, or meta text.`;
-
-// TTS Backend configuration
-const TTS_API_URL = "/tts-api/tts/v1/audio/speech";
-const TTS_MODEL_NAME = "matcha-tts-v1";
 
 // Language mapping for TTS
 const ttsLanguageMap = {
@@ -72,6 +65,7 @@ const generateLipsync = (text, duration) => {
 };
 
 export const ChatProvider = ({ children }) => {
+  const { config } = useApiConfig();
   const [error, setError] = useState(null);
   const [language, setLanguage] = useState('kk'); // Default to Kazakh
   const [voiceGender, setVoiceGender] = useState('female'); // 'male' or 'female'
@@ -82,6 +76,12 @@ export const ChatProvider = ({ children }) => {
   const [performanceMetrics, setPerformanceMetrics] = useState(null);
   const [sttTime, setSttTime] = useState(0); // Store STT time
   const [chatHistory, setChatHistory] = useState([]); // Store conversation history
+
+  // Extract API configuration
+  const LLM_API_URL = config.llm.url;
+  const LLM_MODEL_NAME = config.llm.model;
+  const TTS_API_URL = config.tts.url;
+  const TTS_MODEL_NAME = config.tts.model;
 
   const chat = async (message, userLanguage = language, voiceSttTime = null) => {
     setLoading(true);
@@ -137,11 +137,18 @@ export const ChatProvider = ({ children }) => {
 
       console.log('Sending to LLM with full response (no token limit), enable_thinking: false, and system prompt for language:', userLanguage);
 
+      const headers = {
+        "Content-Type": "application/json"
+      };
+
+      // Add API key if provided
+      if (config.llm.apiKey) {
+        headers["Authorization"] = `Bearer ${config.llm.apiKey}`;
+      }
+
       const response = await fetch(LLM_API_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: headers,
         body: JSON.stringify(requestBody)
       });
 
@@ -375,11 +382,18 @@ export const ChatProvider = ({ children }) => {
       console.log('Voice gender:', voiceGender);
       console.log('Text to convert:', responseText.substring(0, 100));
 
+      const ttsHeaders = {
+        "Content-Type": "application/json"
+      };
+
+      // Add API key if provided
+      if (config.tts.apiKey) {
+        ttsHeaders["Authorization"] = `Bearer ${config.tts.apiKey}`;
+      }
+
       const ttsResponse = await fetch(TTS_API_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: ttsHeaders,
         body: JSON.stringify({
           model: TTS_MODEL_NAME,
           input: responseText,
@@ -543,11 +557,18 @@ export const ChatProvider = ({ children }) => {
       // Call Local TTS API for the greeting
       const ttsLang = ttsLanguageMap[greetingLanguage] || 'en';
 
+      const ttsHeaders = {
+        "Content-Type": "application/json"
+      };
+
+      // Add API key if provided
+      if (config.tts.apiKey) {
+        ttsHeaders["Authorization"] = `Bearer ${config.tts.apiKey}`;
+      }
+
       const ttsResponse = await fetch(TTS_API_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: ttsHeaders,
         body: JSON.stringify({
           model: TTS_MODEL_NAME,
           input: greetingText,
