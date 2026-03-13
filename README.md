@@ -7,6 +7,12 @@ This repository presents a lightweight, multilingual avatar system for real-time
 **Local:** Uses quantized Qolda model (4.3B parameters), Whisper Turbo ASR, and Matcha-TTS
 **Cloud-based:** Uses Oylan LLM and MangiSoz APIs
 
+## 📦 Reproducing the Work
+
+**For Local Deployment:** Set up the three backend services and Avatar UI: 1. Deploy Qolda LLM using llama.cpp by downloading the quantized GGUF model from HuggingFace (issai/Qolda or issai/Qolda_GGUF) and running it with llama.cpp's server mode on port 8080 to provide an OpenAI-compatible API endpoint 2. Deploy the ASR service using faster-whisper (https://github.com/SYSTRAN/faster-whisper) conversion, wrapping it in a FastAPI backend that mimics OpenAI's Whisper API format; 3. Deploy the TTS service using ISSAI's TTS(issai/tts in HF, it is accessible with only by permission of ISSAI) wrapped in a custom FastAPI backend, which requires no optimization as it's already fast. 4. Clone the Avatar UI repository(https://github.com/IS2AI/lightweight_avatar), run npm install to install dependencies, and start the development server with npm run dev - the Vite proxy will automatically route /api, /tts-api, and /asr-api requests to your local services.
+
+**For Cloud Deployment:** Instead of running local services, click the "API Settings" button in the avatar UI, switch to "Cloud Deployment" mode, and configure the three API endpoints: for LLM, use either a cloud-hosted Qolda instance or alternatives like Oylan API with your API key; for ASR, use MangiSoz API which provides faster-whisper as a service; for TTS, use cloud-hosted MangiSoz API TTS service or alternatives that are OpenAI-compatible API formats. The configuration is saved to localStorage and persists across sessions, enabling seamless switching between local and cloud deployments without code changes.
+
 **Key Results:**
 - Local deployment is 62% faster (2.20s vs 5.74s end-to-end latency)
 - LLM inference: 76% faster locally (0.99s vs 4.11s)
@@ -64,174 +70,7 @@ npm run dev
 5. **Open in browser:**
 Navigate to `http://localhost:5173/`
 
-## 🌐 Deployment Options
-
-This avatar system supports **two deployment architectures**: local (on-device) and cloud-based. You can easily switch between them using the API Settings interface in the UI.
-
-### 📍 Local Deployment (Recommended for Best Performance)
-
-**For Local Deployment**, set up the three backend services and the Avatar UI:
-
-1. **Deploy Qolda LLM using llama.cpp** (Port 8080)
-   - Download the quantized GGUF model from HuggingFace: [issai/Qolda](https://huggingface.co/issai/Qolda) or [issai/Qolda_GGUF](https://huggingface.co/issai/Qolda_GGUF)
-   - Install [llama.cpp](https://github.com/ggerganov/llama.cpp) and run the server:
-   ```bash
-   # Clone llama.cpp
-   git clone https://github.com/ggerganov/llama.cpp
-   cd llama.cpp
-   make
-
-   # Download Qolda GGUF model
-   # Place model in llama.cpp/models/
-
-   # Start server on port 8080 (OpenAI-compatible API)
-   ./server -m models/qolda-4.3b-q4_k_m.gguf --port 8080 --host 0.0.0.0
-   ```
-   - **Why llama.cpp?** It provides fast inference with minimal memory footprint compared to vLLM (consumes all GPU VRAM) or lmdeploy (requires >10GB)
-
-2. **Deploy ASR service using faster-whisper** (Port 8002)
-   - Install [faster-whisper](https://github.com/SYSTRAN/faster-whisper):
-   ```bash
-   pip install faster-whisper fastapi uvicorn python-multipart
-   ```
-   - Create a FastAPI wrapper that mimics OpenAI's Whisper API format:
-   ```python
-   # asr_server.py
-   from fastapi import FastAPI, File, UploadFile, Form
-   from faster_whisper import WhisperModel
-   import uvicorn
-
-   app = FastAPI()
-   model = WhisperModel("large-v2", device="cuda", compute_type="float16")
-
-   @app.post("/v1/audio/transcriptions")
-   async def transcribe(
-       file: UploadFile = File(...),
-       model: str = Form(...),
-       language: str = Form(None)
-   ):
-       audio_bytes = await file.read()
-       # Save temporarily and transcribe
-       with open("temp.wav", "wb") as f:
-           f.write(audio_bytes)
-
-       segments, info = model.transcribe("temp.wav", language=language)
-       text = " ".join([segment.text for segment in segments])
-
-       return {"text": text}
-
-   if __name__ == "__main__":
-       uvicorn.run(app, host="0.0.0.0", port=8002)
-   ```
-   - Start the server:
-   ```bash
-   python asr_server.py
-   ```
-
-3. **Deploy TTS service** (Port 8001)
-   - Use ISSAI's TTS model ([issai/tts](https://huggingface.co/issai/tts) on HuggingFace - accessible only with ISSAI permission)
-   - Wrap it in a FastAPI backend:
-   ```python
-   # tts_server.py
-   from fastapi import FastAPI
-   from fastapi.responses import StreamingResponse
-   import uvicorn
-   # Import your TTS model here
-
-   app = FastAPI()
-
-   @app.post("/tts/v1/audio/speech")
-   async def synthesize(request: dict):
-       text = request["input"]
-       voice = request["voice"]  # "male" or "female"
-       lang = request["lang"]     # "kk", "ru", or "en"
-
-       # Generate audio using your TTS model
-       audio_bytes = your_tts_model.synthesize(text, voice, lang)
-
-       return StreamingResponse(io.BytesIO(audio_bytes), media_type="audio/wav")
-
-   if __name__ == "__main__":
-       uvicorn.run(app, host="0.0.0.0", port=8001)
-   ```
-   - Start the server:
-   ```bash
-   python tts_server.py
-   ```
-   - **Note:** No optimization needed as TTS is already fast
-
-4. **Start Avatar UI**
-   ```bash
-   cd lightweight_avatar
-   npm install
-   npm run dev
-   ```
-   - The Vite proxy (configured in `vite.config.js`) will automatically route:
-     - `/api` → `http://localhost:8080` (LLM)
-     - `/tts-api` → `http://localhost:8001` (TTS)
-     - `/asr-api` → `http://localhost:8002` (ASR)
-
-**Performance:** Local deployment achieves 62% faster performance (2.20s vs 5.74s end-to-end latency) compared to cloud deployment.
-
-### ☁️ Cloud Deployment (Flexible, No Local Setup)
-
-**For Cloud Deployment**, instead of running local services, configure cloud API endpoints directly in the UI:
-
-1. **Start the Avatar UI:**
-   ```bash
-   cd lightweight_avatar
-   npm install
-   npm run dev
-   ```
-
-2. **Configure API endpoints in the UI:**
-   - Open http://localhost:5173/
-   - Click the **"API Settings"** button in the top-right corner
-   - Switch to **"Cloud Deployment"** mode
-   - Configure the three services:
-
-   **LLM Configuration:**
-   - **Option A:** Use cloud-hosted Qolda instance
-   - **Option B:** Use Oylan API (ISSAI's cloud LLM service)
-   - **Option C:** Use alternatives like OpenAI GPT-4
-     ```
-     URL: https://api.openai.com/v1/chat/completions
-     Model: gpt-4
-     API Key: sk-your-openai-key
-     ```
-
-   **ASR Configuration:**
-   - **Option A:** Use MangiSoz API (provides faster-whisper as a service)
-   - **Option B:** Use OpenAI Whisper API
-     ```
-     URL: https://api.openai.com/v1/audio/transcriptions
-     Model: whisper-1
-     API Key: sk-your-openai-key
-     ```
-
-   **TTS Configuration:**
-   - **Option A:** Use cloud-hosted MangiSoz TTS service
-   - **Option B:** Use alternatives like ElevenLabs API
-     ```
-     URL: https://api.elevenlabs.io/v1/text-to-speech
-     Model: eleven_multilingual_v2
-     API Key: your-elevenlabs-key
-     ```
-
-3. **Save configuration:**
-   - Click **"Save Configuration"**
-   - Settings are saved to localStorage and persist across sessions
-   - You can switch between local and cloud deployments anytime without code changes
-
-**All cloud services must follow OpenAI-compatible API formats.**
-
-### 🔄 Switching Between Deployments
-
-The avatar system supports seamless switching between local and cloud deployments:
-- Configuration is saved to browser localStorage
-- No code changes required
-- Simply update API endpoints in the settings modal
-- Restart not required - changes apply immediately
+**Note:** For full functionality, you need to set up backend services (LLM, TTS, ASR) as described in the "Reproducing the Work" section above, or configure cloud API endpoints using the "API Settings" button in the UI.
 
 ## 🎮 Usage Guide
 
