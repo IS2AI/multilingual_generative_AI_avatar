@@ -22,11 +22,11 @@ This repository presents a lightweight, multilingual avatar system for real-time
 
 ## 📊 User Study Materials
 
-This folder contains the questionnaires used in the within-subjects user study evaluating an AI avatar typing interface across three language conditions: **Kazakh**, **Russian**, and **English**.
+The [`user_study/`](user_study/) folder contains the questionnaires used in the within-subjects user study evaluating an AI avatar typing interface across three language conditions: **Kazakh**, **Russian**, and **English**.
 
 ### Contents
 
-- [`plain_questions.pdf`](plain_questions.pdf) — Full list of study questions administered to participants (N=7).
+- [`user_study/plain_questions.pdf`](user_study/plain_questions.pdf) — Full list of study questions administered to participants (N=7).
 
 ### Study Design
 
