@@ -9,7 +9,7 @@ This repository presents a lightweight, multilingual avatar system for real-time
 
 ## 📦 Reproducing the Work
 
-**For Local Deployment:** Set up the three backend services and Avatar UI: 1. Deploy Qolda LLM using llama.cpp by downloading the quantized GGUF model from HuggingFace (issai/Qolda or issai/Qolda_GGUF) and running it with llama.cpp's server mode on port 8080 to provide an OpenAI-compatible API endpoint 2. Deploy the ASR service using faster-whisper (https://github.com/SYSTRAN/faster-whisper) conversion, wrapping it in a FastAPI backend that mimics OpenAI's Whisper API format; 3. Deploy the TTS service using ISSAI's TTS(issai/tts in HF, it is accessible with only by permission of ISSAI) wrapped in a custom FastAPI backend, which requires no optimization as it's already fast. 4. Clone the Avatar UI repository(https://github.com/IS2AI/lightweight_avatar), run npm install to install dependencies, and start the development server with npm run dev - the Vite proxy will automatically route /api, /tts-api, and /asr-api requests to your local services.
+**For Local Deployment:** Set up the three backend services and Avatar UI: 1. Deploy Qolda LLM using llama.cpp by downloading the quantized GGUF model from HuggingFace (issai/Qolda or issai/Qolda_GGUF) and running it with llama.cpp's server mode on port 8080 to provide an OpenAI-compatible API endpoint 2. Deploy the ASR service using faster-whisper (https://github.com/SYSTRAN/faster-whisper) conversion, wrapping it in a FastAPI backend that mimics OpenAI's Whisper API format; 3. Deploy the TTS service using ISSAI's TTS(issai/tts in HF, it is accessible with only by permission of ISSAI) wrapped in a custom FastAPI backend, which requires no optimization as it's already fast. 4. Clone the Avatar UI repository(https://github.com/IS2AI/multilingual_generative_AI_avatar), run npm install to install dependencies, and start the development server with npm run dev - the Vite proxy will automatically route /api, /tts-api, and /asr-api requests to your local services.
 
 **For Cloud Deployment:** Instead of running local services, click the "API Settings" button in the avatar UI, switch to "Cloud Deployment" mode, and configure the three API endpoints: for LLM, use either a cloud-hosted Qolda instance or alternatives like Oylan API with your API key; for ASR, use MangiSoz API which provides faster-whisper as a service; for TTS, use cloud-hosted MangiSoz API TTS service or alternatives that are OpenAI-compatible API formats. The configuration is saved to localStorage and persists across sessions, enabling seamless switching between local and cloud deployments without code changes.
 
@@ -66,8 +66,8 @@ The following diagram illustrates the complete system architecture comparing clo
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/IS2AI/lightweight_avatar
-cd lightweight_avatar
+git clone https://github.com/IS2AI/multilingual_generative_AI_avatar
+cd multilingual_generative_AI_avatar
 ```
 
 2. **Install dependencies:**
