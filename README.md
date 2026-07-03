@@ -53,7 +53,7 @@ The [`user_study/`](user_study/) folder contains the questionnaires used in the 
 
 The following diagram illustrates the complete system architecture comparing cloud-based and local deployment approaches:
 
-![System Pipeline](./Colored_merged_pipeline.drawio.svg)
+![System Pipeline](./figure_1_avatar.png)
 
 ## 🚀 Quick Start
 
